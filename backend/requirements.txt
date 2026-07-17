@@ -1,0 +1,11 @@
+﻿fastapi==0.139.0
+aiofiles==24.1.0
+uvicorn==0.50.0
+python-multipart==0.0.32
+pydantic-settings==2.14.2
+aiosqlite==0.22.1
+sqlmodel==0.0.39
+pytest==9.1.1
+httpx==0.28.1
+aiomysql==0.3.2
+cryptography==49.0.0
