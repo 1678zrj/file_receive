@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # -- Redis -- 配置
     redis_url: str = "redis://localhost:6379/0"
-    redis_max_connections: int = 20
+    redis_max_connections: int = 100
     redis_socket_keepalive: bool = True
 
 

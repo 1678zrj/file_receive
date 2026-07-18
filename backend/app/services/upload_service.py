@@ -2,7 +2,7 @@
 
 from fastapi import Depends, UploadFile, HTTPException
 
-from app.db.session import get_session
+
 from app.file.session_manager import SessionManager, get_session_manager, UploadSession
 from app.file.base_storage import BaseStorage
 from app.file.storage_factory import get_storage
@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.models.table import FileRecord
 
 import uuid
-from pathlib import Path
+
 
 class UploadService:
 
@@ -36,7 +36,7 @@ class UploadService:
             total_chunks: int
     ) -> UploadSession:
         upload_id = uuid.uuid4().hex
-        new_session = self.session_manager.add_session(
+        new_session = await self.session_manager.add_session(
             upload_id= upload_id,
             file_name= file_name,
             file_hash= file_hash,
@@ -52,14 +52,14 @@ class UploadService:
         tmp_path = build_tmp_path(upload_id=upload_id, chunk_index=chunk_index)
         await self.storage.upload_chunk(chunk_path=tmp_path, file=chunk_file)
         try:
-            self.session_manager.add_uploaded_chunk(upload_id=upload_id, chunk_index=chunk_index)
+            await self.session_manager.add_uploaded_chunk(upload_id=upload_id, chunk_index=chunk_index)
         except ValueError:
             raise HTTPException(status_code=404, detail=f"Unknown upload session: {upload_id}")
 
 
     async def merge_chunks(self, upload_id: str, db: AsyncSession) -> FileRecord:
         try:
-            session = self.session_manager.get_session(upload_id=upload_id)
+            session = await self.session_manager.get_session(upload_id=upload_id)
         except ValueError:
             raise HTTPException(status_code=404, detail=f"Unknown upload session: {upload_id}")
         total_chunks = session.total_chunks
@@ -82,6 +82,6 @@ class UploadService:
 
     async def get_status(self, upload_id: str) -> UploadSession:
         try:
-            return self.session_manager.get_session(upload_id=upload_id)
+            return await self.session_manager.get_session(upload_id=upload_id)
         except ValueError:
             raise HTTPException(status_code=404, detail=f"Unknown upload session: {upload_id}")
