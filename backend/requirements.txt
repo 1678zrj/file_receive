@@ -9,3 +9,5 @@ pytest==9.1.1
 httpx==0.28.1
 aiomysql==0.3.2
 cryptography==49.0.0
+redis==8.0.1
+hiredis==3.4.0

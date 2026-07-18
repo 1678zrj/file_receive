@@ -13,5 +13,5 @@ class StorageFactory:
             return LocalStorage()
 
 
-def get_storage() -> BaseStorage:
+async def get_storage() -> BaseStorage:
     return StorageFactory.get_storage_engine()

@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
-from functools import lru_cache
+from fastapi import Depends
+from redis.asyncio import Redis
+from app.redis.redis_client import get_redis
+
 
 @dataclass
 class UploadSession:
@@ -15,10 +18,18 @@ class UploadSession:
 
 
 class SessionManager:
-    def __init__(self):
-        self._sessions: dict[str, UploadSession] = {}
+    def __init__(self, redis_client: Redis, ttl: int = 86400):
+        self.redis = redis_client
+        self.prefix = "upload_session"
+        self.ttl = ttl
 
-    def add_session(
+    def _meta_key(self, upload_id: str) -> str:
+        return f"{self.prefix}:{upload_id}:meta"
+
+    def _chunks_key(self, upload_id: str) -> str:
+        return f"{self.prefix}:{upload_id}:chunks"
+
+    async def add_session(
             self,
             upload_id: str,
             file_name: str,
@@ -29,7 +40,22 @@ class SessionManager:
             chunk_size: int,
             total_chunks: int
     ) -> UploadSession:
-        new_session = UploadSession(
+        meta_key = self._meta_key(upload_id)
+        mapping = {
+            "upload_id": upload_id,
+            "file_name": file_name,
+            "file_hash": file_hash,
+            "file_ext": file_ext,
+            "mime_type": mime_type,
+            "total_size": str(total_size),
+            "chunk_size": str(chunk_size),
+            "total_chunks": str(total_chunks)
+        }
+        pipeline = self.redis.pipeline()
+        pipeline.hset(meta_key, mapping=mapping)  # type: ignore
+        pipeline.expire(meta_key, self.ttl)  # type: ignore
+        await pipeline.execute()
+        return UploadSession(
             upload_id=upload_id,
             file_name=file_name,
             file_hash=file_hash,
@@ -39,30 +65,48 @@ class SessionManager:
             chunk_size=chunk_size,
             total_chunks=total_chunks
         )
-        self._sessions[upload_id] = new_session
-        return new_session
 
-    def get_session(self, upload_id: str) -> UploadSession:
-        session = self._sessions.get(upload_id, None)
-        if session is None:
+    async def get_session(self, upload_id) -> UploadSession:
+        meta_key = self._meta_key(upload_id)
+        chunks_key = self._chunks_key(upload_id)
+        pipeline = self.redis.pipeline()
+        pipeline.hgetall(meta_key)
+        pipeline.smembers(chunks_key)
+        meta, chunks = await pipeline.execute()
+        if not meta:
             raise ValueError(f"Unknown upload session: {upload_id}")
-        return session
+        return UploadSession(
+            upload_id=meta["upload_id"],
+            file_name=meta["file_name"],
+            file_hash=meta["file_hash"],
+            file_ext=meta["file_ext"],
+            mime_type=meta["mime_type"],
+            total_size=int(meta["total_size"]),
+            chunk_size=int(meta["chunk_size"]),
+            total_chunks=int(meta["total_chunks"]),
+            uploaded_chunks={int(chunk_index) for chunk_index in chunks}
+        )
 
-    def delete_session(self, upload_id: str):
-        session = self._sessions.pop(upload_id, None)
-        if session is None:
+    async def add_uploaded_chunk(self, upload_id: str, chunk_index: int):
+        meta_key = self._meta_key(upload_id)
+        chunks_key = self._chunks_key(upload_id)
+        if not await self.redis.exists(meta_key):
+            raise ValueError(f"Unknown upload session: {upload_id}")
+        pipeline = self.redis.pipeline()
+        pipeline.sadd(chunks_key, chunk_index)
+        pipeline.expire(chunks_key, self.ttl)
+        pipeline.expire(meta_key, self.ttl)
+        await pipeline.execute()
+
+    async def delete_session(self, upload_id: str):
+        meta_key = self._meta_key(upload_id)
+        chunks_key = self._chunks_key(upload_id)
+        deleted_count = await self.redis.delete(meta_key, chunks_key)
+        if deleted_count == 0:
             raise ValueError(f"Unknown upload session: {upload_id}")
 
-    def add_uploaded_chunk(self, upload_id: str, chunk_index: int):
-        session = self._sessions.get(upload_id, None)
-        if session is None:
-            raise ValueError(f"Unknown upload session: {upload_id}")
-        session.uploaded_chunks.add(chunk_index)
 
-
-
-
-@lru_cache()
-def get_session_manager():
-    return SessionManager()
-
+async def get_session_manager(
+        redis: Redis = Depends(get_redis)
+):
+    return SessionManager(redis)
