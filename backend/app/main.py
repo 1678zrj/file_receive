@@ -1,6 +1,7 @@
 ﻿from fastapi import FastAPI
 
 from app.core.config import settings
+from app.redis.redis_client import RedisManager
 from app.api.v1.router import api_router as v1_router
 
 from contextlib import asynccontextmanager
@@ -15,7 +16,9 @@ async def lifespan(app: FastAPI):
 
     await create_db_and_tables()
     await init_test_data()
+    await RedisManager.init()
     yield
+    await RedisManager.close()
 
 
 

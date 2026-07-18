@@ -63,6 +63,6 @@ class SessionManager:
 
 
 @lru_cache()
-def get_session_manager():
+async def get_session_manager():
     return SessionManager()
 

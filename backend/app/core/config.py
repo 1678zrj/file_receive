@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     # --流式读取 UploadFile 的缓冲区大小（1MB）--
     stream_chunk_size: int = 4 * 1024 * 1024
 
+    # -- Redis -- 配置
+    redis_url: str = "redis://localhost:6379/0"
+    redis_max_connections: int = 20
+    redis_socket_keepalive: bool = True
+
+
     # -- 业务命名空间白名单 --
     # 只有在此列表中的 namespace 才允许作为存储路径前缀
     # 通过环境变量 FR_ALLOWED_NAMESPACES 配置，逗号分隔，例如：
