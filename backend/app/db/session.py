@@ -7,14 +7,25 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.table import User, Course, Enrollment, Assignment, UserRole
 from app.core.config import settings
 
+engine: AsyncEngine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    pool_size=20,
+    max_overflow=30,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+    # 针对MySQL的额外优化参数
+    connect_args={
+        "connect_timeout": 10,     # 连接数据库的超时
+    }
+)
+AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-
-engine: AsyncEngine = create_async_engine(settings.database_url, echo= False)
-AsyncSessionLocal = async_sessionmaker(engine, class_= AsyncSession, expire_on_commit=False)
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
+
 
 async def create_db_and_tables() -> None:
     async with engine.begin() as conn:
@@ -33,13 +44,17 @@ async def init_test_data() -> None:
         # 使用你新定义的 UserRole 枚举
         # ==========================================
         users_to_create = [
-            User(role=UserRole.ADMIN, username="admin", password_hash="fake_hash", real_name="系统管理员",
+            User(role=UserRole.ADMIN, username="admin",
+                 password_hash="$2b$12$2q90ANd77q2yHoRFJwPHFOxMbmKBsCiyqX8KxKY..E9lV26K2x/me", real_name="系统管理员",
                  email="admin@tests.com"),
-            User(role=UserRole.TEACHER, username="teacher_li", password_hash="fake_hash", real_name="李老师",
+            User(role=UserRole.TEACHER, username="teacher_li",
+                 password_hash="$2b$12$2q90ANd77q2yHoRFJwPHFOxMbmKBsCiyqX8KxKY..E9lV26K2x/me", real_name="李老师",
                  email="li@tests.com"),
-            User(role=UserRole.STUDENT, username="student_zhang", password_hash="fake_hash", real_name="张同学",
+            User(role=UserRole.STUDENT, username="student_zhang",
+                 password_hash="$2b$12$2q90ANd77q2yHoRFJwPHFOxMbmKBsCiyqX8KxKY..E9lV26K2x/me", real_name="张同学",
                  email="zhang@tests.com"),
-            User(role=UserRole.STUDENT, username="student_wang", password_hash="fake_hash", real_name="王同学",
+            User(role=UserRole.STUDENT, username="student_wang",
+                 password_hash="$2b$12$2q90ANd77q2yHoRFJwPHFOxMbmKBsCiyqX8KxKY..E9lV26K2x/me", real_name="王同学",
                  email="wang@tests.com"),
         ]
 
@@ -134,4 +149,3 @@ async def init_test_data() -> None:
         await session.commit()
         print("[-] Assignment 数据就绪")
         print("🎉 测试数据初始化完成！")
-

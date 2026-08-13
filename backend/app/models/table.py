@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import UniqueConstraint, Column, Enum
 import enum
 
+
 # 枚举类型
 class UserRole(int, enum.Enum):
     STUDENT = 0
@@ -31,7 +32,7 @@ class Course(SQLModel, table= True):
     name: str
     course_code: str | None = Field(default=None, unique=True, index=True,description="课程代码")
     teacher_id: int = Field(foreign_key="user.id",description="创建这门课程的教师id")
-    overview: str | None = Field(default="暂无简介", description="课程简介")
+    overview: str = Field(default="暂无简介", description="课程简介")
     created_at: datetime = Field(default_factory= utc_now)
 
 
@@ -40,10 +41,12 @@ class Enrollment(SQLModel, table= True):
     __tablename__ = "enrollment"
     # 在 Python 中，带有括号但没有逗号的单元素会被解析为该元素本身，而不是元组（Tuple）。
     # 注意要加,（逗号），否则在Python中会被认成单个元素而非元组
+    # 由于student_id写在前面，因此只给它加了索引
     __table_args__ = (UniqueConstraint("student_id", "course_id", name= "uq_student_course"),)
     id: int | None = Field(default=None, primary_key=True)
     student_id: int = Field(foreign_key="user.id", description="选修该门课程的学生")
-    course_id: int = Field(foreign_key="course.id", description="该门课程的id")
+    # 为了优化相关查询的速度（如统计选课学生人数），索引
+    course_id: int = Field(foreign_key="course.id", index=True, description="该门课程的id")
     score: float | None = Field(default= None, description="学生该门课程的分数")
 
 # 课程资源表（一位老师可以上传多个课程资源，一个课程资源只对应一位老师）

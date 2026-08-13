@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import AsyncGenerator
+
 from fastapi import UploadFile
 from pathlib import Path
 
@@ -7,7 +9,7 @@ from pathlib import Path
 class BaseStorage(ABC):
 
     @abstractmethod
-    async def upload_chunk(self, chunk_path: Path, file: UploadFile):
+    async def upload_chunk(self, chunk_path: Path, file: AsyncGenerator[bytes, None]):
         ...
 
     @abstractmethod

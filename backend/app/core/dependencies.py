@@ -1,43 +1,34 @@
-﻿from functools import lru_cache
+﻿from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from fastapi import status
 
-from app.core.config import settings
-from app.filecenter.interfaces import StorageBackend
-from app.filecenter.key_builder import StorageKeyBuilder
-from app.filecenter.chunked_manager import ChunkedUploadManager
-from app.filecenter.storage.local import LocalStorage
+from app.services.user_service import UserService
+from app.models.table import User, UserRole
 
-
-# -- 单例工厂 --
-
-@lru_cache
-def _build_storage() -> StorageBackend:
-    return LocalStorage(root_dir=settings.storage_root)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-@lru_cache
-def _build_key_builder() -> StorageKeyBuilder:
-    return StorageKeyBuilder()
+async def get_current_user(
+        token: str = Depends(oauth2_scheme),
+        user_service: UserService = Depends()
+) -> User:
+    user = await user_service.access_token(access_token=token)
+    return user
 
 
-# -- FastAPI Depends --
-
-def get_storage() -> StorageBackend:
-    return _build_storage()
-
-
-def get_key_builder() -> StorageKeyBuilder:
-    return _build_key_builder()
-
-
-# ChunkedUploadManager 有状态（内存会话），用单例保证会话一致性
-_chunked_manager: ChunkedUploadManager | None = None
-
-
-def get_chunked_manager() -> ChunkedUploadManager:
-    global _chunked_manager
-    if _chunked_manager is None:
-        _chunked_manager = ChunkedUploadManager(
-            storage=_build_storage(),
-            key_builder=_build_key_builder(),
+async def get_teacher(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role < UserRole.TEACHER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="权限不足：需要教师或管理员权限"
         )
-    return _chunked_manager
+    return current_user
+
+
+async def get_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role < UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="权限不足：需要管理员权限"
+        )
+    return current_user

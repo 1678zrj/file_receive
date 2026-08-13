@@ -1,3 +1,4 @@
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.table import FileRecord
@@ -26,7 +27,10 @@ class UploadCRUD:
         await db.flush()
         return upload_file
 
-
+    async def get_file_record_by_id(self, db: AsyncSession, id: int) -> FileRecord:
+        stat = select(FileRecord).where(FileRecord.id == id)
+        result = await db.exec(stat)
+        return result.first()
 
 
 upload_crud = UploadCRUD()
