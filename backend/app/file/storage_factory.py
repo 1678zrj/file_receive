@@ -1,6 +1,7 @@
 from app.core.config import settings
-from app.file.local_storage import LocalStorage
+from app.file.local_storage2 import LocalStorage
 from app.file.base_storage import BaseStorage
+
 
 class StorageFactory:
 

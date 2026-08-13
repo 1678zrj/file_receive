@@ -1,4 +1,7 @@
-﻿from sqlmodel.ext.asyncio.session import AsyncSession
+﻿import asyncio
+from typing import AsyncGenerator
+
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from fastapi import Depends, UploadFile, HTTPException
 
@@ -12,6 +15,7 @@ from app.core.config import settings
 from app.models.table import FileRecord
 
 import uuid
+
 
 
 class UploadService:
@@ -35,6 +39,7 @@ class UploadService:
             chunk_size: int,
             total_chunks: int
     ) -> UploadSession:
+
         upload_id = uuid.uuid4().hex
         new_session = await self.session_manager.add_session(
             upload_id= upload_id,
@@ -48,7 +53,8 @@ class UploadService:
         )
         return new_session
 
-    async def upload_file_chunk(self, upload_id: str, chunk_index: int, chunk_file: UploadFile):
+    async def upload_file_chunk(self, upload_id: str, chunk_index: int, chunk_file: AsyncGenerator[bytes, None]):
+
         tmp_path = build_tmp_path(upload_id=upload_id, chunk_index=chunk_index)
         await self.storage.upload_chunk(chunk_path=tmp_path, file=chunk_file)
         try:
@@ -58,6 +64,7 @@ class UploadService:
 
 
     async def merge_chunks(self, upload_id: str, db: AsyncSession) -> FileRecord:
+
         try:
             session = await self.session_manager.get_session(upload_id=upload_id)
         except ValueError:

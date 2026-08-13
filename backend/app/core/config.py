@@ -2,10 +2,12 @@
 from pydantic_settings import BaseSettings
 
 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
 class Settings(BaseSettings):
     model_config = {
         "env_prefix": "FR_",
-        "env_file": ".env",
+        "env_file": BASE_DIR / ".env",
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
@@ -29,13 +31,18 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = 3600 * 24  # 上传会话过期时间 24 小时
 
     # --流式读取 UploadFile 的缓冲区大小（1MB）--
-    stream_chunk_size: int = 4 * 1024 * 1024
+    stream_chunk_size: int = 1 * 1024 * 1024
 
     # -- Redis -- 配置
-    redis_url: str = "redis://localhost:6379/0"
-    redis_max_connections: int = 100
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    redis_max_connections: int = 500
     redis_socket_keepalive: bool = True
 
+    # -- 鉴权 --
+    secret_key: str = "test"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 1
 
     # -- 业务命名空间白名单 --
     # 只有在此列表中的 namespace 才允许作为存储路径前缀
@@ -45,3 +52,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+# print(settings)
+# print(Path(__file__).resolve())
+# print(Path(__file__).resolve().parent)

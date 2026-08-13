@@ -1,4 +1,6 @@
-﻿from fastapi import UploadFile, APIRouter, Depends, File, Form, Body, Path as RequestPath
+﻿import os
+
+from fastapi import UploadFile, APIRouter, Depends, File, Form, Body, Path as RequestPath, Request, Query
 from app.services.upload_service import UploadService
 from app.schemas import upload_schema
 from app.schemas.upload_schema import InitUploadResponse, UploadStatusResponse, MergeChunksResponse
@@ -29,15 +31,16 @@ async def init_upload(
 
 @router.post("/{upload_id}/chunk")
 async def upload_chunk(
+        request: Request,
         upload_id: str = RequestPath(...),
-        chunk_index: int = Form(...),
-        chunk_file: UploadFile = File(...),
+        chunk_index: int = Query(...),
         upload_service: UploadService = Depends()
 ):
+    print(f"[PID: {os.getpid()}] 接收到文件分片")
     await upload_service.upload_file_chunk(
         upload_id=upload_id,
         chunk_index=chunk_index,
-        chunk_file=chunk_file
+        chunk_file=request.stream()
     )
 
 @router.get("/{upload_id}/status", response_model=UploadStatusResponse)

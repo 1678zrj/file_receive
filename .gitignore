@@ -1,3 +1,6 @@
 /backend/record
 /backend/tests
 /backend/.env
+/backend/__pycache__/
+/backend/*.pyc
+/backend/data

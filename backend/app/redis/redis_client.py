@@ -13,6 +13,8 @@ class RedisManager:
                 url=settings.redis_url,
                 max_connections=settings.redis_max_connections,
                 socket_keepalive=settings.redis_socket_keepalive,
+                socket_timeout=10.0,  # 等待 Redis 响应的超时调大到 10 秒
+                socket_connect_timeout=5.0,  # 连接超时调大
                 decode_responses=True,
                 encoding="utf-8"
             )
