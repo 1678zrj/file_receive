@@ -59,15 +59,6 @@ class LocalStorage(BaseStorage):
     async def merge_chunks(self, source_paths: list[Path], target_path: Path):
         # asyncio.to_thread 内部会自动使用底层的 ThreadPoolExecutor
         # 不会阻塞主事件循环，保证 upload_chunk 能顺畅接收网络数据
-        async with merge_sem:
-            await asyncio.to_thread(self._sync_merge_chunks, source_paths, target_path)
-    # async def merge_chunks(self, source_paths: list[Path], target_path: Path):
-    #     await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
-    #     async with ayafileio.open(target_path, mode="wb") as wf:
-    #         for tmp_chunk_path in source_paths:
-    #             async with ayafileio.open(tmp_chunk_path, mode="rb") as rf:
-    #                 while True:
-    #                     chunk = await rf.read(self.stream_chunk_size)
-    #                     if not chunk:
-    #                         break
-    #                     await wf.write(chunk)
+
+        await asyncio.to_thread(self._sync_merge_chunks, source_paths, target_path)
+

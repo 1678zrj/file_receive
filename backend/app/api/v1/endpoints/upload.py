@@ -1,11 +1,12 @@
 ﻿import os
 
-from fastapi import UploadFile, APIRouter, Depends, File, Form, Body, Path as RequestPath, Request, Query
+from fastapi import UploadFile, APIRouter, Depends, File, Form, Body, Path as RequestPath, Request, Query, status
 from app.services.upload_service import UploadService
 from app.schemas import upload_schema
-from app.schemas.upload_schema import InitUploadResponse, UploadStatusResponse, MergeChunksResponse
-from app.db.session import get_session
-from sqlmodel.ext.asyncio.session import AsyncSession
+from app.schemas.upload_schema import InitUploadResponse, UploadStatusResponse, MergeChunksResponse, \
+    MergeTriggerResponse
+from app.schemas.upload_schema import UploadStatus
+
 
 
 router = APIRouter()
@@ -53,25 +54,45 @@ async def get_upload_status(
     )
     return UploadStatusResponse(
         upload_id = upload_session.upload_id,
+        status = upload_session.status,
         uploaded_chunks = upload_session.uploaded_chunks,
-        total_chunks = upload_session.total_chunks
+        total_chunks = upload_session.total_chunks,
+        file_record_id = upload_session.file_record_id
     )
 
 
-@router.post("/{upload_id}/merge", response_model=MergeChunksResponse)
+# @router.post("/{upload_id}/merge", response_model=MergeChunksResponse)
+# async def merge_chunks(
+#         upload_id: str = RequestPath(...),
+#         upload_service: UploadService = Depends(),
+#         db: AsyncSession = Depends(get_session)
+# ):
+#     file_records = await upload_service.merge_chunks(
+#         upload_id=upload_id,
+#         db=db
+#     )
+#     return MergeChunksResponse(
+#         status="success",
+#         file_record_id=file_records.id,
+#         storage_key=str(file_records.storage_key)
+#     )
+
+
+@router.post(
+    "/{upload_id}/merge",
+    response_model=MergeTriggerResponse,
+    status_code=status.HTTP_202_ACCEPTED
+)
 async def merge_chunks(
-        upload_id: str = RequestPath(...),
-        upload_service: UploadService = Depends(),
-        db: AsyncSession = Depends(get_session)
+    upload_id: str = RequestPath(...),
+    upload_service: UploadService = Depends()
 ):
-    file_records = await upload_service.merge_chunks(
-        upload_id=upload_id,
-        db=db
+    """
+    触发文件合并（非阻塞，返回 202 Accepted）
+    """
+    task_id = await upload_service.trigger_merge(upload_id=upload_id)
+    return MergeTriggerResponse(
+        status=UploadStatus.MERGING,
+        task_id=task_id,
+        upload_id=upload_id
     )
-    return MergeChunksResponse(
-        status="success",
-        file_record_id=file_records.id,
-        storage_key=str(file_records.storage_key)
-    )
-
-

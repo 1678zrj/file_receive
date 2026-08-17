@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, Query
 from app.schemas.enrollment_schema import EnrollmentCreate, EnrollmentResponse, CourseStudentRead
 from app.services.enrollment_service import EnrollmentService
-from app.core.dependencies import get_current_user
+from app.rbac.dependencies import get_current_user
 from app.models.table import User
 from app.schemas.common_schema import PageResponse
+from app.rbac.dependencies import require_perm
+from app.rbac.permissions import Permission
+
 
 router = APIRouter()
 
@@ -12,7 +15,7 @@ router = APIRouter()
 async def enrollment_register(
         enrollment_in: EnrollmentCreate,
         enrollment_service: EnrollmentService = Depends(),
-        current_user: User = Depends(get_current_user)
+        current_user: User = Depends(require_perm(Permission.COURSE_ENROLL))
 ):
     enrollment_record = await enrollment_service.register_enrollment(
         enrollment_in,

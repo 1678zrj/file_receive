@@ -18,9 +18,11 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./study.db"
     # -- 存储 --
-    file_root_dir: Path = Path("data/storage/")
+    file_root_dir: Path = BASE_DIR / "data/storage/"
     # 上传临时目录（相对于 storage_root）
-    upload_tmp_dir: Path = Path("data/tmp/")
+    # upload_tmp_dir: Path = BASE_DIR / "data/tmp/"
+    upload_tmp_dir: Path = Path("C:/tmp/")
+
 
     storage_type: str = "local"
     # -- 上传限制 --

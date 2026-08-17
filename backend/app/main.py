@@ -7,6 +7,7 @@ from app.api.v1.router import api_router as v1_router
 
 from contextlib import asynccontextmanager
 from app.db.session import create_db_and_tables, init_test_data
+from app.core.broker import startup_broker, shutdown_broker
 
 
 
@@ -16,9 +17,10 @@ async def lifespan(app: FastAPI):
     await create_db_and_tables()
     await init_test_data()
     await RedisManager.init()
-    redis = RedisManager.get_client()
-    await redis.set("test:perf", "hello")
+    await startup_broker()
+
     yield
+    await shutdown_broker()
     await RedisManager.close()
 
 

@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, Query
 from app.schemas.course_resource_schema import CourseResourceCreate, CourseResourceResponse
-from app.core.dependencies import get_teacher
+from app.rbac.dependencies import get_teacher
 from app.models.table import User
 from app.services.course_resource_service import CourseResourceService
+from app.rbac.dependencies import require_perm
+from app.rbac.permissions import Permission
+
 
 router = APIRouter()
 
@@ -11,7 +14,7 @@ router = APIRouter()
 async def register_course_resource(
         course_resource_in: CourseResourceCreate,
         course_resource_service: CourseResourceService = Depends(),
-        teacher: User = Depends(get_teacher)
+        teacher: User = Depends(require_perm(Permission.RESOURCE_CREATE))
 ):
     course_resource = await course_resource_service.register_course_resource(
         course_resource_in,
