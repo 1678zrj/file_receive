@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from fastapi import Depends, UploadFile, HTTPException
 
-
+from app.file.session_manager import UploadStatus
 from app.file.session_manager import SessionManager, get_session_manager, UploadSession
 from app.file.base_storage import BaseStorage
 from app.file.storage_factory import get_storage
@@ -13,6 +13,7 @@ from app.file.key_builder import build_tmp_path, build_final_path
 from app.crud.upload_crud import upload_crud
 from app.core.config import settings
 from app.models.table import FileRecord
+from app.tasks.merge_tasks import merge_file
 
 import uuid
 
@@ -64,7 +65,6 @@ class UploadService:
 
 
     async def merge_chunks(self, upload_id: str, db: AsyncSession) -> FileRecord:
-
         try:
             session = await self.session_manager.get_session(upload_id=upload_id)
         except ValueError:
@@ -84,6 +84,27 @@ class UploadService:
         )
         await db.commit()
         return file_record
+
+    async def trigger_merge(self, upload_id: str) -> str:
+        try:
+            session = await self.session_manager.get_session(upload_id=upload_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail=f"Unknown upload session: {upload_id}")
+        if len(session.uploaded_chunks) != session.total_chunks:
+            missing_chunks = set(range(session.total_chunks)) - session.uploaded_chunks
+            raise HTTPException(
+                status_code=400,
+                detail=f"Chunks incomplete. Missing: {list(missing_chunks)}"
+            )
+        if session.status in [UploadStatus.MERGING, UploadStatus.COMPLETED]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File is already in {session.status} state"
+            )
+        await self.session_manager.set_status(upload_id, UploadStatus.MERGING)
+        task = await merge_file.kiq(upload_id=upload_id)
+        return task.task_id
+
 
 
 

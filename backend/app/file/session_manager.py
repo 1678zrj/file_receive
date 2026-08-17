@@ -1,8 +1,16 @@
 from dataclasses import dataclass, field
+from enum import Enum
+
 from fastapi import Depends
 from redis.asyncio import Redis
 from app.redis.redis_client import get_redis
 
+
+class UploadStatus(str, Enum):
+    UPLOADING = "uploading"
+    MERGING = "merging"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 @dataclass
 class UploadSession:
@@ -14,6 +22,8 @@ class UploadSession:
     total_size: int
     chunk_size: int
     total_chunks: int
+    status: UploadStatus = UploadStatus.UPLOADING
+    file_record_id: int | None = None
     uploaded_chunks: set[int] = field(default_factory=set)
 
 
@@ -49,12 +59,14 @@ class SessionManager:
             "mime_type": mime_type,
             "total_size": str(total_size),
             "chunk_size": str(chunk_size),
-            "total_chunks": str(total_chunks)
+            "total_chunks": str(total_chunks),
+            "status": UploadStatus.UPLOADING
         }
         pipeline = self.redis.pipeline()
         pipeline.hset(meta_key, mapping=mapping)  # type: ignore
         pipeline.expire(meta_key, self.ttl)  # type: ignore
         await pipeline.execute()
+
         return UploadSession(
             upload_id=upload_id,
             file_name=file_name,
@@ -75,6 +87,7 @@ class SessionManager:
         meta, chunks = await pipeline.execute()
         if not meta:
             raise ValueError(f"Unknown upload session: {upload_id}")
+        file_record_id = meta.get("file_record_id") or None
         return UploadSession(
             upload_id=meta["upload_id"],
             file_name=meta["file_name"],
@@ -84,6 +97,8 @@ class SessionManager:
             total_size=int(meta["total_size"]),
             chunk_size=int(meta["chunk_size"]),
             total_chunks=int(meta["total_chunks"]),
+            status=meta.get("status", UploadStatus.UPLOADING),
+            file_record_id = int(file_record_id) if file_record_id else None,
             uploaded_chunks={int(chunk_index) for chunk_index in chunks}
         )
 
@@ -97,6 +112,21 @@ class SessionManager:
         pipeline.expire(chunks_key, self.ttl)
         pipeline.expire(meta_key, self.ttl)
         await pipeline.execute()
+
+    async def set_status(
+            self,
+            upload_id: str,
+            status: UploadStatus,
+            file_record_id: int | None = None,
+            error_msg: str | None = None
+    ):
+        meta_key = self._meta_key(upload_id)
+        mapping = {"status": status}
+        if file_record_id is not None:
+            mapping["file_record_id"] = str(file_record_id)
+        if error_msg is not None:
+            mapping["error_msg"] = error_msg
+        await self.redis.hset(meta_key, mapping=mapping)
 
     async def delete_session(self, upload_id: str):
         meta_key = self._meta_key(upload_id)
