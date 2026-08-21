@@ -1,10 +1,10 @@
-from app.models.table import Enrollment
+from app.models.base import Enrollment
 from collections.abc import Sequence
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from sqlmodel import func
 from sqlalchemy.engine import RowMapping
-from app.models.table import User, Enrollment
+from app.models.base import User, Enrollment
 
 class EnrollmentCrud:
 

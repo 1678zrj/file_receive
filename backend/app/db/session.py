@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from app.models.table import User, Course, Enrollment, Assignment, UserRole
+from app.models.base import User, Course, Enrollment, Assignment, UserRole
 from app.core.config import settings
 
 engine: AsyncEngine = create_async_engine(

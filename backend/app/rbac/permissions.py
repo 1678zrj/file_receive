@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Set, Dict
-from app.models.table import UserRole
+from app.models.base import UserRole
 
 
 class Permission(str, Enum):
@@ -16,8 +16,10 @@ class Permission(str, Enum):
     ASSIGNMENT_UPDATE = "assignment:update"
     ASSIGNMENT_DELETE = "assignment:delete"
     ASSIGNMENT_GRADE = "assignment:grade"
-
-    # 选课 作业提交
+    # 课程知识库管理
+    # 课程知识库文件上传
+    COURSE_KB_INDEX = "course:index"
+    # 学生选课 作业提交
     COURSE_ENROLL = "course:enroll"
     SUBMISSION_CREATE = "submission:create"
 
@@ -33,7 +35,8 @@ ROLE_PERMISSIONS: Dict[UserRole, Set[Permission]] = {
         Permission.ASSIGNMENT_CREATE,
         Permission.ASSIGNMENT_UPDATE,
         Permission.ASSIGNMENT_DELETE,
-        Permission.ASSIGNMENT_GRADE
+        Permission.ASSIGNMENT_GRADE,
+        Permission.COURSE_KB_INDEX
     },
     UserRole.STUDENT: {
         Permission.COURSE_ENROLL,

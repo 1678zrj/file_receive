@@ -51,6 +51,20 @@ class Settings(BaseSettings):
     # 通过环境变量 FR_ALLOWED_NAMESPACES 配置，逗号分隔，例如：
     #   FR_ALLOWED_NAMESPACES=avatar,submission,courseware
     allowed_namespaces: list[str] = ["avatar", "submission", "courseware", "material"]
+    # -- RAG
+    rag_vector_store_type: str
+    rag_embedder_type: str
+    #  -- 文档分割策略
+    rag_splitter_type: str = "recursive"
+    # -- embedding 模型 --
+    embedding_model_name: str
+    embedding_base_url: str
+    embedding_api_key: str
+    embedding_dimensions: int = 1024
+    # -- 向量数据库Milvus配置 --
+    milvus_uri: str
+    milvus_token: str
+    milvus_collection_name: str
 
 
 settings = Settings()

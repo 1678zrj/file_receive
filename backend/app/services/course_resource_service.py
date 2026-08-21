@@ -4,7 +4,7 @@ from app.db.session import get_session
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import Depends
 from app.schemas.course_resource_schema import CourseResourceCreate
-from app.models.table import CourseResource
+from app.models.base import CourseResource
 from fastapi import HTTPException, status
 from app.crud.course_crud import course_crud
 

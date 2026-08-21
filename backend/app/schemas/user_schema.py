@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel
-from app.models.table import UserRole
+from app.models.base import UserRole
 
 
 class UserCreate(BaseModel):

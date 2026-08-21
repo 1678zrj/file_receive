@@ -14,6 +14,7 @@ from app.schemas.upload_schema import UploadStatus
 async def merge_file(
     upload_id: str
 ):
+    """当前文档还是以绝对路径存储在数据库中，未来需要修改"""
     storage = LocalStorage()
     session_manager = SessionManager(redis_client=RedisManager.get_client())
     session = await session_manager.get_session(upload_id)

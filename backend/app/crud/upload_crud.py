@@ -1,7 +1,7 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.table import FileRecord
+from app.models.base import FileRecord
 
 class UploadCRUD:
 
