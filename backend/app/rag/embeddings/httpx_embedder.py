@@ -98,7 +98,22 @@ class HttpxEmbedder(BaseEmbedder):
 
     async def embed_query(self, text: str) -> list[float]:
         """获取检索Query向量"""
-        pass
+        headers = {
+            "Authorization": f"Bearer {self.embedding_api_key}"
+        }
+        payload = {
+            "input": text,
+            "model": self.model_name
+        }
+        response = await self.client.post(
+            url=self.base_url,
+            headers=headers,
+            json=payload
+        )
+        response.raise_for_status()
+        data = response.json()["data"]
+        return data[0]["embedding"]
+
 
 async def test():
     from app.core.config import settings
@@ -113,6 +128,19 @@ async def test():
     print(len(embeddings[1]))
     await embedder.shutdown()
 
+async def test_query():
+    from app.core.config import settings
+    embedder = HttpxEmbedder(
+        base_url=settings.embedding_base_url,
+        model_name=settings.embedding_model_name,
+        embedding_api_key=settings.embedding_api_key
+    )
+    await embedder.startup()
+    embedding = await embedder.embed_query("你好")
+    print(type(embedding))
+    print(len(embedding))
+    await embedder.shutdown()
+
 if __name__ == "__main__":
-    asyncio.run(test())
+    asyncio.run(test_query())
 

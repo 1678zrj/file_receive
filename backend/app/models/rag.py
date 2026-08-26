@@ -4,6 +4,11 @@ from sqlmodel import SQLModel, Field
 from app.models.base import utc_now
 
 
+
+
+# 一个知识库文件记录只对应一个物理文件实体（file_record）
+# 但是一个物理文件实体可以对应多个知识库文件记录
+# 因为不同的课程/用户的知识库中可能存同一份文件
 class KnowledgeDocument(SQLModel, table=True):
     __tablename__ = "knowledge_document"
     __table_args__ = (UniqueConstraint("file_hash", "scope_id", name="uq_file_scope"),)

@@ -35,7 +35,8 @@ app = FastAPI(
     lifespan=lifespan,
     title=settings.app_name,
     debug=settings.debug,
-    default_response_class=ORJSONResponse
+    # 已经过时，不再全局启用，但在全局异常处理中可启用
+    # default_response_class=ORJSONResponse
 )
 
 app.include_router(v1_router, prefix="/api/v1")

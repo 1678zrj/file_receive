@@ -157,7 +157,10 @@ class MilvusVectorStore(BaseVectorStore):
         search_param_1 = {
             "data": [query_vector],
             "anns_field": "dense_vector",
-            "param": {"nprobe": 10},
+            "param": {
+                "metric_type": "IP",
+                "nprobe": 10
+            },
             "limit": limit * 2,
             "expr": filters
         }
@@ -165,6 +168,9 @@ class MilvusVectorStore(BaseVectorStore):
         search_param_2 = {
             "data": [query],
             "anns_field": "sparse_vector",
+            "param": {
+                "metric_type": "BM25"
+            },
             "limit": limit * 2,
             "expr": filters
         }
@@ -186,9 +192,23 @@ class MilvusVectorStore(BaseVectorStore):
             limit=limit,
             output_fields=output_fields
         )
-
-
-        pass
+        results = []
+        # 结果在res[0]中，因为这是单向量检索
+        # 每个hit都对应着检索到的向量及其数据
+        for i, hit in enumerate(res[0]):
+            # hit["entity"]就是我们指定的output_fields中字段的结果字典
+            entity = hit["entity"]
+            # 其余的id,score都在hit字典中，是必返回字段
+            id = hit.get("id")
+            score = hit.get("score")
+            results.append(
+                {
+                    "id":id,
+                    "score":score,
+                    **{output_field: entity.get(output_field) for output_field in output_fields}
+                }
+            )
+        return results
 
 
 
