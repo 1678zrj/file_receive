@@ -1,6 +1,6 @@
 ﻿from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class UploadStatus(str, Enum):
@@ -19,9 +19,18 @@ class InitUploadRequest(BaseModel):
     chunk_size: int
     total_chunks: int
 
-
 class InitUploadResponse(BaseModel):
+
     upload_id: str
+
+
+# class InitUploadResponse(BaseModel):
+#     is_completed: bool
+#     upload_id: str | None = None
+#     file_record_id: int | None = None
+#     uploaed_chunks: set[int] = Field(default_factory=set)
+
+    # uploaded_chunks: set[int] = set() 虽然Pydantic可以这么写,但是规范起见
 
 
 class UploadStatusResponse(BaseModel):

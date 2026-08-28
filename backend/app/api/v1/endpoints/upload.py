@@ -6,7 +6,8 @@ from app.schemas import upload_schema
 from app.schemas.upload_schema import InitUploadResponse, UploadStatusResponse, MergeChunksResponse, \
     MergeTriggerResponse
 from app.schemas.upload_schema import UploadStatus
-
+from app.rbac.dependencies import get_current_user
+from app.models.base import User
 
 
 router = APIRouter()
@@ -15,7 +16,8 @@ router = APIRouter()
 @router.post("/init", response_model=upload_schema.InitUploadResponse)
 async def init_upload(
         upload_info: upload_schema.InitUploadRequest,
-        upload_service: UploadService = Depends()
+        upload_service: UploadService = Depends(),
+        current_user: User = Depends(get_current_user)
 ):
     upload_session = await upload_service.init_file_upload(
         upload_info.file_name,

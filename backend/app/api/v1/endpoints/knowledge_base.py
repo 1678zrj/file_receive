@@ -16,6 +16,7 @@ async def course_file_index(
         teacher: User = Depends(require_perm(Permission.COURSE_KB_INDEX))
 ):
     new_kb_doc = await rag_index_service.index_course_file(
+        title=course_file_index.title,
         file_record_id=course_file_index.file_record_id,
         course_id=course_file_index.course_id,
         teacher_id=teacher.id,

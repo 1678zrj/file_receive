@@ -7,7 +7,7 @@ from app.rag.vector_stores.base import BaseVectorStore
 
 
 class MilvusVectorStore(BaseVectorStore):
-
+    
     def __init__(
             self,
             uri: str,
@@ -54,7 +54,7 @@ class MilvusVectorStore(BaseVectorStore):
             auto_id=False,
             enable_dynamic_field=True
         )
-        # 该id要自己生成
+        # 文本块的唯一主键，使用 knowledge_doc_id_chunk_index
         schema.add_field("id", DataType.VARCHAR, is_primary=True, max_length=256)
         schema.add_field("dense_vector", DataType.FLOAT_VECTOR, dim=1024)
         schema.add_field("sparse_vector", DataType.SPARSE_FLOAT_VECTOR)
@@ -63,13 +63,18 @@ class MilvusVectorStore(BaseVectorStore):
             "filter": ["lowercase"]
         }
         schema.add_field("chunk_text", DataType.VARCHAR, max_length=16384, enable_analyzer=True, analyzer_params = analyzer_params, enable_match = True)
+        schema.add_field("knowledge_doc_id", DataType.INT64)  #关联KnowledgeDocument.id
         # 添加file_record_id，用于快速查找文档对应的chunk
-        schema.add_field("file_record_id", DataType.VARCHAR, max_length=256)
+        schema.add_field("file_record_id", DataType.INT64) #关联物理文件id(file_record.id)
         schema.add_field("file_hash", DataType.VARCHAR, max_length=256)
         # 添加scope，如course, user
         schema.add_field("scope", DataType.VARCHAR, max_length=256)
         # 添加scope_id，用于进行各种过滤
         schema.add_field("scope_id", DataType.VARCHAR, max_length=256)
+        # 添加chunk_index，切片序号
+        schema.add_field("chunk_index", DataType.INT64)
+        # 添加文本块启用机制
+        schema.add_field("is_enabled", DataType.BOOL)
         # Add function to schema
         bm25_function = Function(
             name="text_bm25_emb",
@@ -88,6 +93,7 @@ class MilvusVectorStore(BaseVectorStore):
         index_params.add_index(field_name="file_record_id", index_name="idx_file_record_id", index_type="INVERTED")
         index_params.add_index(field_name="file_hash", index_name="idx_file_hash", index_type="INVERTED")
         index_params.add_index(field_name="scope", index_name="idx_scope", index_type="INVERTED")
+        index_params.add_index(field_name="knowledge_doc_id", index_name="idx_knowledge_doc_id", index_type="INVERTED")
         await client.create_collection(
             collection_name=self.collection_name,
             schema=schema,
@@ -110,20 +116,30 @@ class MilvusVectorStore(BaseVectorStore):
             self,
             dense_vectors: list[list[float]],
             chunk_texts: list[str],
-            file_record_id: str,
+            knowledge_doc_id: int,
+            file_record_id: int,
             file_hash: str,
             scope: str,
-            scope_id: str
+            scope_id: str,
+            is_enabled: bool = True
     ) -> dict:
+        # 1. 提前生成所有 ID 列表
+        ids = [
+            f"knowledge_doc_{knowledge_doc_id}_chk_{i}"
+            for i in range(len(dense_vectors))
+        ]
         data = [
             {
-                "id": f"{file_hash}_{scope_id}_{str(i)}",
+                "id": ids[i],
                 "dense_vector": dense_vector,
                 "chunk_text": chunk_texts[i],
+                "knowledge_doc_id": knowledge_doc_id,
                 "file_record_id": file_record_id,
                 "file_hash": file_hash,
                 "scope": scope,
-                "scope_id": scope_id
+                "scope_id": scope_id,
+                "chunk_index": i,
+                "is_enabled": is_enabled
             }
             for i, dense_vector in enumerate(dense_vectors)
         ]
@@ -131,9 +147,34 @@ class MilvusVectorStore(BaseVectorStore):
             collection_name=self.collection_name,
             data=data
         )
+        # 4. 将生成的 ids 合并到返回结果中
+        return {
+            "upsert_count": res.get("upsert_count", len(ids)),
+            "ids": ids
+        }
+
+    async def delete_by_doc_id(
+            self,
+            knowledge_doc_id: int
+    ):
+        filter = f"knowledge_doc_id == {knowledge_doc_id}"
+        res = await self.client.delete(
+            collection_name=self.collection_name,
+            filter=filter
+        )
         return res
 
-
+    async def delete_by_doc_ids(
+            self,
+            knowledge_doc_ids: list[int]
+    ):
+        ids_str = ",".join(map(str, knowledge_doc_ids))
+        filter = f"knowledge_doc_id in [{ids_str}]"
+        res = await self.client.delete(
+            collection_name=self.collection_name,
+            filter=filter
+        )
+        return res
 
 
 
