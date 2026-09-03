@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     #   FR_ALLOWED_NAMESPACES=avatar,submission,courseware
     allowed_namespaces: list[str] = ["avatar", "submission", "courseware", "material"]
     # -- RAG
-    rag_markdown_storage_dir: Path = BASE_DIR / "markdowns"
+    rag_markdown_storage_dir: Path = BASE_DIR / "data" / "markdowns"
     rag_vector_store_type: str
     rag_embedder_type: str
     #  -- 文档分割策略

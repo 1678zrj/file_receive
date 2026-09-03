@@ -27,8 +27,13 @@ class UploadCRUD:
         await db.flush()
         return upload_file
 
-    async def get_file_record_by_id(self, db: AsyncSession, id: int) -> FileRecord:
+    async def get_file_record_by_id(self, db: AsyncSession, id: int) -> FileRecord | None:
         stat = select(FileRecord).where(FileRecord.id == id)
+        result = await db.exec(stat)
+        return result.first()
+
+    async def get_file_record_by_hash(self, db: AsyncSession, file_hash: str) -> FileRecord | None:
+        stat = select(FileRecord).where(FileRecord.file_hash == file_hash)
         result = await db.exec(stat)
         return result.first()
 
