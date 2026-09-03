@@ -4,3 +4,4 @@
 /backend/__pycache__/
 /backend/*.pyc
 /backend/data
+__pycache__
