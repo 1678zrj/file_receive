@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from app.schemas.course_resource_schema import CourseResourceCreate, CourseResourceResponse
 from app.rbac.dependencies import get_teacher
-from app.models.table import User
+from app.models.base import User
 from app.services.course_resource_service import CourseResourceService
 from app.rbac.dependencies import require_perm
 from app.rbac.permissions import Permission

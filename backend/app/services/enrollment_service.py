@@ -2,7 +2,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.db.session import get_session
 from fastapi import Depends
 from app.schemas.enrollment_schema import EnrollmentCreate, CourseStudentRead
-from app.models.table import Enrollment
+from app.models.base import Enrollment
 from app.crud.course_crud import course_crud
 from app.crud.enrollement_crud import enrollment_crud
 from fastapi import HTTPException, status

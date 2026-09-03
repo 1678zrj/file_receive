@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from app.schemas.enrollment_schema import EnrollmentCreate, EnrollmentResponse, CourseStudentRead
 from app.services.enrollment_service import EnrollmentService
 from app.rbac.dependencies import get_current_user
-from app.models.table import User
+from app.models.base import User
 from app.schemas.common_schema import PageResponse
 from app.rbac.dependencies import require_perm
 from app.rbac.permissions import Permission

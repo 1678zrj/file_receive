@@ -2,9 +2,9 @@
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import status
 
-from app.models.table import User
+from app.models.base import User
 from app.services.user_service import UserService
-from app.models.table import User, UserRole
+from app.models.base import User, UserRole
 from app.rbac.permissions import Permission, ROLE_PERMISSIONS
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")

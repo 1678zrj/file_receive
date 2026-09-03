@@ -119,5 +119,5 @@ class FileRecord(SQLModel, table= True):
     storage_type: str = Field(description="该文件的存储方式：本地 / minio")
     storage_key: str = Field(description="该文件的真实路径")
     total_size: int = Field(description="该文件的大小，单位字节")
-    file_hash: str = Field(description="该文件的hash值")
+    file_hash: str = Field(description="该文件的hash值", unique=True)
     created_at: datetime = Field(default_factory=utc_now)

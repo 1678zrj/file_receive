@@ -1,6 +1,6 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
-from app.models.table import User
+from app.models.base import User
 
 
 class UserCrud:

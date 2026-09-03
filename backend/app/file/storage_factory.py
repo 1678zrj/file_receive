@@ -13,6 +13,10 @@ class StorageFactory:
         if storage_type == "local":
             return LocalStorage()
 
+        raise RuntimeError(
+            f"Unsupported storage type: {storage_type}"
+        )
+
 
 async def get_storage() -> BaseStorage:
     return StorageFactory.get_storage_engine()

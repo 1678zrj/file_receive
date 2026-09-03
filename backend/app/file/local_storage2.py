@@ -1,4 +1,5 @@
-﻿from typing import AsyncGenerator
+﻿import hashlib
+from typing import AsyncGenerator
 
 
 
@@ -43,22 +44,27 @@ class LocalStorage(BaseStorage):
                         await f.write(chunk)
 
     # 1. 提取出来的同步合并方法
-    def _sync_merge_chunks(self, source_paths: list[Path], target_path: Path):
+    def _sync_merge_chunks(self, source_paths: list[Path], target_path: Path) -> str:
         # 使用 pathlib 创建目录，exist_ok=True 避免已存在时报错
         target_path.parent.mkdir(parents=True, exist_ok=True)
-
+        hasher = hashlib.sha256()
         # 使用标准的同步 open
         with open(target_path, mode="wb") as wf:
             for tmp_chunk_path in source_paths:
                 with open(tmp_chunk_path, mode="rb") as rf:
-                    # 使用 shutil.copyfileobj 代替手动的 while True 读取
-                    # length 参数指定每次读取的块大小，避免内存溢出
-                    shutil.copyfileobj(rf, wf, length=self.stream_chunk_size)
+                    while chunk := rf.read(self.stream_chunk_size):
+                        wf.write(chunk)
+                        hasher.update(chunk)
+        return hasher.hexdigest()
 
     # 2. 原来的异步入口，使用 asyncio.to_thread 将其放入默认线程池执行
-    async def merge_chunks(self, source_paths: list[Path], target_path: Path):
+    async def merge_chunks(self, source_paths: list[Path], target_path: Path) -> str:
         # asyncio.to_thread 内部会自动使用底层的 ThreadPoolExecutor
         # 不会阻塞主事件循环，保证 upload_chunk 能顺畅接收网络数据
 
-        await asyncio.to_thread(self._sync_merge_chunks, source_paths, target_path)
+        return await asyncio.to_thread(
+            self._sync_merge_chunks,
+            source_paths,
+            target_path
+        )
 

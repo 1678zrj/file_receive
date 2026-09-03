@@ -1,5 +1,5 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
-from app.models.table import CourseResource
+from app.models.base import CourseResource
 from sqlmodel import select
 
 class CourseResourceCrud:

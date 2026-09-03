@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, status
 from app.db.session import get_session
 from app.auth.jwt import jwt_manager
 from app.auth.pwd_hash import pwd_manager
-from app.models.table import User
+from app.models.base import User
 from app.crud.user_crud import user_crud
 from app.schemas.auth_schema import Token
 from jose import JWTError

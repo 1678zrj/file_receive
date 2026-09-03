@@ -1,6 +1,6 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from app.models.table import Course
+from app.models.base import Course
 
 
 class CourseCrud:

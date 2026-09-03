@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator
-
-from fastapi import UploadFile
 from pathlib import Path
 
 

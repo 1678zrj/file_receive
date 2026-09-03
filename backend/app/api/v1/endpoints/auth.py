@@ -3,7 +3,7 @@ from app.schemas.auth_schema import Token, AccessToken
 from app.services.user_service import UserService
 from app.schemas.auth_schema import UserLogin
 from app.core.config import settings
-from app.models.table import User
+from app.models.base import User
 from app.rbac.dependencies import get_current_user
 
 router = APIRouter()
