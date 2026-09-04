@@ -49,14 +49,16 @@ class SessionManager:
             local raw_meta = redis.call('GET', existing_meta_key)
             if raw_meta then
                 local data = cjson.decode(raw_meta)
-                -- 活跃态或已完成态: 统一续期并返回已有会话
-                if data['status'] == 'uploading' or data['status'] == 'merging' or data['status'] == 'completed' then
+                -- 活跃态: 统一续期并返回已有会话
+                -- completed作为应该终态被清理
+                -- 否则会存在数据库记录没有却秒传的诡异情况,最终都得以数据库记录为准
+                if data['status'] == 'uploading' or data['status'] == 'merging' then
                     redis.call('EXPIRE', user_hash_key, ttl)
                     redis.call('EXPIRE', existing_meta_key, ttl)
                     redis.call('EXPIRE', chunks_prefix .. existing_upload_id, ttl)
                     return {0, existing_upload_id, raw_meta}
                 end
-                -- 对于失败态的情况,清理历史残留
+                -- 对于完成态或失败态的情况,清理历史残留
                 redis.call('DEL', chunks_prefix .. existing_upload_id)
                 redis.call('DEL', existing_meta_key)
             end

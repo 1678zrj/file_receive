@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.schemas.knowledge_base_schema import CourseFileIndexRequest, CourseFileIndexResponse
-from app.services.rag_index_service import RAGIndexService
+from app.services.rag_index_service import get_rag_index_service, RAGIndexService
 from fastapi import Depends
 from app.rbac.permissions import Permission
 from app.rbac.dependencies import require_perm
@@ -12,7 +12,7 @@ router = APIRouter()
 @router.post("/course", response_model=CourseFileIndexResponse)
 async def course_file_index(
         course_file_index: CourseFileIndexRequest,
-        rag_index_service: RAGIndexService = Depends(),
+        rag_index_service: RAGIndexService = Depends(get_rag_index_service),
         teacher: User = Depends(require_perm(Permission.COURSE_KB_INDEX))
 ):
     new_kb_doc = await rag_index_service.index_course_file(

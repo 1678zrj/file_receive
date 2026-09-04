@@ -11,9 +11,9 @@ from app.file.session_manager import UploadStatus
 from app.file.session_manager import SessionManager, get_session_manager, UploadSession
 from app.file.base_storage import BaseStorage
 from app.file.storage_factory import get_storage
-from app.file.key_builder import build_tmp_path, build_final_path
+from app.file.key_builder import build_tmp_path
 from app.crud.upload_crud import upload_crud
-from app.core.config import settings
+
 from app.models.base import FileRecord
 from app.tasks.merge_tasks import merge_file
 from pathlib import Path

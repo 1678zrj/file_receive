@@ -4,6 +4,12 @@ from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+
+"""
+    文件路径配置规范
+    根目录路径末尾不带/
+    相对路径开头不带/
+"""
 class Settings(BaseSettings):
     model_config = {
         "env_prefix": "FR_",
@@ -16,9 +22,12 @@ class Settings(BaseSettings):
     app_name: str = "File Receive"
     debug: bool = False
 
-    database_url: str = "sqlite+aiosqlite:///./study.db"
+    # 绑定BASE_DIR,防止启动目录不同导致数据库文件漂移
+    database_url: str = f"sqlite+aiosqlite:///{BASE_DIR / 'study.db'}"
+
+
     # -- 存储 --
-    file_root_dir: Path = BASE_DIR / "data/storage/"
+    file_root_dir: Path = BASE_DIR / "data" / "storage"
     # 上传临时目录（相对于 storage_root）
     # upload_tmp_dir: Path = BASE_DIR / "data/tmp/"
     upload_tmp_dir: Path = Path("C:/tmp/")

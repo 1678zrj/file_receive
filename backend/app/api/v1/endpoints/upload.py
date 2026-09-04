@@ -39,13 +39,7 @@ async def init_upload(
             upload_id = None,
             uploaded_chunks = []
         )
-    if upload_session.status == UploadStatus.COMPLETED and upload_session.file_record_id:
-        return InitUploadResponse(
-            instant_upload=True,
-            file_record_id=upload_session.file_record_id,
-            upload_id=upload_session.upload_id,
-            uploaded_chunks=list(upload_session.uploaded_chunks)
-        )
+
     return InitUploadResponse(
         instant_upload=False,
         upload_id = upload_session.upload_id,

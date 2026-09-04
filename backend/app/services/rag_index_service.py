@@ -7,7 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import Depends
 from app.crud.upload_crud import upload_crud
 from pathlib import Path
-from app.core.rag_deps import get_rag
+from app.core.rag_deps import get_rag_container
 from app.rag.container import RAGContainer
 from app.rag.embeddings.base import BaseEmbedder
 from app.rag.vector_stores.base import BaseVectorStore
@@ -19,23 +19,21 @@ from app.models.rag import KnowledgeDoc, DocumentStatus
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
+from app.file.key_builder import build_final_path
 
 
 class RAGIndexService:
     def __init__(
             self,
-            rag_container: RAGContainer = Depends(get_rag),
-            embedder: BaseEmbedder = Depends(get_embedder),
-            vector_store: BaseVectorStore = Depends(get_vector_store),
-            db: AsyncSession = Depends(get_session)
+            rag_container: RAGContainer,
+            db: AsyncSession
     ):
 
         self.db = db
         self.rag_container = rag_container
-        self.embedder = embedder
-        self.vector_store = vector_store
+        self.embedder = rag_container.embedder
+        self.vector_store = rag_container.vector_store
         self.rag_markdown_storage_dir = settings.rag_markdown_storage_dir
-
 
     def _build_markdown_storage_key(
             self,
@@ -46,11 +44,7 @@ class RAGIndexService:
         relative_path = f"scope_{scope}/{scope_id}/doc_{knowledge_doc_id}.md"
         return self.rag_markdown_storage_dir / relative_path, relative_path
 
-
-
-
     # 该函数专用于上传文件到向量数据库
-    # 不用于更新已存在向量数据库中的某文件，那个实现逻辑更加复杂
     async def index_course_file(
             self,
             title: str,
@@ -102,9 +96,9 @@ class RAGIndexService:
                 )
             # 2、已存在且正在进行解析、分块、向量化中的任何一步（这里假定的是状态在这些情况都是正常进行的，而不是异常终止的）
             elif existing_kb_doc.status in (
-                DocumentStatus.CHUNKING,
-                DocumentStatus.INDEXING,
-                DocumentStatus.PARSING
+                    DocumentStatus.CHUNKING,
+                    DocumentStatus.INDEXING,
+                    DocumentStatus.PARSING
             ):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -116,7 +110,7 @@ class RAGIndexService:
                 # 这里利用数据库的单行排他锁（即数据库自带锁），通过查看当前更新操作影响的数量来判断谁抢到了
                 row_count = await knowledge_base_crud.update_kb_doc_failed_status(
                     self.db,
-                    id = existing_kb_doc.id
+                    id=existing_kb_doc.id
                 )
                 if row_count == 0:
                     raise HTTPException(
@@ -166,7 +160,8 @@ class RAGIndexService:
             # 第一步是文档解析
             # 如果markdown文件已经存在,则可以不用解析,直接读取,否则解析并持久化存储
             if kb_doc.markdown_storage_key is None:
-                raw_file_path = Path(raw_file_record.storage_key)
+                # raw_file_path = Path(raw_file_record.storage_key)
+                raw_file_path = build_final_path(raw_file_record.storage_key)
                 async with ayafileio.open(raw_file_path, mode='rb') as f:
                     file_bytes = await f.read()
                 file_parser = self.rag_container.get_parser(raw_file_record.file_ext)
@@ -181,11 +176,13 @@ class RAGIndexService:
                 await aiofiles.os.makedirs(markdown_storage_key.parent, exist_ok=True)
                 async with ayafileio.open(markdown_storage_key, mode='w', encoding='utf-8') as f:
                     await f.write(markdown_text)
-                kb_doc.markdown_storage_key = markdown_storage_key
+                #  这里存储的应该是相对路径
+                kb_doc.markdown_storage_key = relative_path
             else:
                 markdown_file_path = self.rag_markdown_storage_dir / kb_doc.markdown_storage_key
                 async with ayafileio.open(markdown_file_path, mode='r', encoding='utf-8') as f:
                     markdown_text = await f.read()
+
             kb_doc.status = DocumentStatus.CHUNKING
             self.db.add(kb_doc)
             await self.db.commit()
@@ -248,3 +245,11 @@ class RAGIndexService:
             )
 
 
+async def get_rag_index_service(
+        rag_container: RAGContainer = Depends(get_rag_container),
+        db: AsyncSession = Depends(get_session)
+) -> RAGIndexService:
+    return RAGIndexService(
+        rag_container,
+        db
+    )
