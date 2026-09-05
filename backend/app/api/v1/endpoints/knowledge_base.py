@@ -19,7 +19,7 @@ async def course_file_index(
         title=course_file_index.title,
         file_record_id=course_file_index.file_record_id,
         course_id=course_file_index.course_id,
-        teacher_id=teacher.id,
+        teacher=teacher,
         splitter_type=course_file_index.splitter_type,
         chunk_size=course_file_index.chunk_size,
         scope=course_file_index.scope,

@@ -8,6 +8,7 @@ from fastapi import Depends
 from app.crud.upload_crud import upload_crud
 from pathlib import Path
 from app.core.rag_deps import get_rag_container
+from app.models.base import User, UserRole
 from app.rag.container import RAGContainer
 from app.rag.embeddings.base import BaseEmbedder
 from app.rag.vector_stores.base import BaseVectorStore
@@ -50,7 +51,7 @@ class RAGIndexService:
             title: str,
             file_record_id: int,
             course_id: int,
-            teacher_id: int,
+            teacher: User,
             scope: str = "course",
             splitter_type: str = "markdown",
             chunk_size: int = 1024
@@ -62,7 +63,7 @@ class RAGIndexService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"课程ID {course_id} 不存在"
             )
-        if target_course.teacher_id != teacher_id:
+        if target_course.teacher_id != teacher.id and teacher.role != UserRole.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="无权管理该课程的知识库"
@@ -138,7 +139,7 @@ class RAGIndexService:
                 "file_record_id": file_record_id,
                 "scope": scope,
                 "scope_id": scope_id,
-                "created_by": teacher_id,
+                "created_by": teacher.id,
                 "status": DocumentStatus.PARSING
             }
             try:

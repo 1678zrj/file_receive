@@ -42,6 +42,7 @@ class RAGContainer:
     def _register_default_parsers(self):
         self._parser_registry[".docx"] = DocxParser
         self._parser_registry[".md"] = MarkdownParser
+        self._parser_registry["md"] = MarkdownParser
 
 
     def get_parser(self, file_extension: str) -> BaseParser:

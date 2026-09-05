@@ -75,27 +75,69 @@ class HttpxEmbedder(BaseEmbedder):
         return self._client
 
 
-    async def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        """批量获取文本向量"""
-        headers = {
-            "Authorization": f"Bearer {self.embedding_api_key}"
-        }
-        payload = {
-            "input": texts,
-            "model": self.model_name
-        }
-        response = await self.client.post(
-            url=self.base_url,
-            headers=headers,
-            json=payload
-        )
-        response.raise_for_status()
-        data = response.json()["data"]
-        return [
-            item["embedding"]
-            for item in data
-        ]
+    # async def embed_documents(self, texts: list[str]) -> list[list[float]]:
+    #     """批量获取文本向量"""
+    #     headers = {
+    #         "Authorization": f"Bearer {self.embedding_api_key}"
+    #     }
+    #     payload = {
+    #         "input": texts,
+    #         "model": self.model_name
+    #     }
+    #     response = await self.client.post(
+    #         url=self.base_url,
+    #         headers=headers,
+    #         json=payload
+    #     )
+    #     response.raise_for_status()
+    #     data = response.json()["data"]
+    #     return [
+    #         item["embedding"]
+    #         for item in data
+    #     ]
+    async def embed_documents(
+            self,
+            texts: list[str],
+            batch_size: int = 16
+    ) -> list[list[float]]:
+        """批量获取文本向量（内置清洗与分批逻辑）"""
+        # 1. 过滤空文本并做安全检查
+        cleaned_texts = [t.strip() for t in texts if t and t.strip()]
+        if not cleaned_texts:
+            return []
 
+        headers = {
+            "Authorization": f"Bearer {self.embedding_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        all_embeddings: list[list[float]] = []
+
+        # 2. 分批发送请求（避免超出百炼接口的 batch limit）
+        for i in range(0, len(cleaned_texts), batch_size):
+            batch = cleaned_texts[i:i + batch_size]
+            payload = {
+                "input": batch,
+                "model": self.model_name
+            }
+
+            response = await self.client.post(
+                url=self.base_url,
+                headers=headers,
+                json=payload
+            )
+
+            # 3. 拦截并输出百炼的真实错误详情
+            if response.is_error:
+                error_detail = response.text
+                raise RuntimeError(
+                    f"Embedding failed with {response.status_code}: {error_detail}"
+                )
+
+            data = response.json().get("data", [])
+            all_embeddings.extend([item["embedding"] for item in data])
+
+        return all_embeddings
     async def embed_query(self, text: str) -> list[float]:
         """获取检索Query向量"""
         headers = {
@@ -136,7 +178,7 @@ async def test_query():
         embedding_api_key=settings.embedding_api_key
     )
     await embedder.startup()
-    embedding = await embedder.embed_query("你好")
+    embedding = await embedder.embed_documents(["你好"]*50)
     print(type(embedding))
     print(len(embedding))
     await embedder.shutdown()

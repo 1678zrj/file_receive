@@ -1,16 +1,5 @@
-/backend/record
-/backend/tests
-/backend/.env
-/backend/__pycache__/
-/backend/*.pyc
-/backend/data
-__pycache__
-
-
 node_modules
 dist
-docs
-.npm-cache
 dist-ssr
 *.local
 .DS_Store

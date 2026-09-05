@@ -1,0 +1,293 @@
+/* ============================================================
+   云课堂 · 全局设计系统（学习通 · 严肃沉稳风）
+   白底 / 细分割线 / 紧凑信息 / 克制蓝色主色 / 高信息密度
+   ============================================================ */
+
+:root {
+  /* 主色：沉稳的教学平台蓝 */
+  --brand: #2d6cdf;
+  --brand-hover: #1f5fc4;
+  --brand-active: #1a52a8;
+  --brand-light: #e8f1fd;
+  --brand-border: #c7dcf7;
+
+  /* 背景 */
+  --bg-page: #f4f6f9;
+  --bg-card: #ffffff;
+  --bg-soft: #f8fafc;
+
+  /* 文字 */
+  --text-main: #1f2733;
+  --text-regular: #4a5568;
+  --text-secondary: #8492a6;
+  --text-faint: #aab4c4;
+
+  /* 边框 */
+  --border: #e3e8ee;
+  --border-dark: #d2d9e2;
+
+  /* 功能色 */
+  --green: #1fa06d;
+  --orange: #e8930c;
+  --red: #e5484d;
+  --red-light: #fdf0f0;
+
+  /* 尺寸 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* 阴影（克制） */
+  --shadow-sm: 0 1px 2px rgba(31, 39, 51, 0.05);
+  --shadow-md: 0 2px 8px rgba(31, 39, 51, 0.08);
+
+  /* 兼容别名（历史组件仍在使用，语义统一到新设计系统） */
+  --border-light: #e3e8ee;
+  --brand-gradient: linear-gradient(135deg, #2d6cdf 0%, #1f5fc4 100%);
+  --brand-gradient-soft: #f0f6ff;
+  --radius-xl: 10px;
+  --radius-lg: 8px;
+  --shadow-lg: 0 4px 16px rgba(31, 39, 51, 0.1);
+  --bg-card: #ffffff;
+  --text-main: #1f2733;
+  --text-regular: #4a5568;
+
+  /* ---- Element Plus 主色覆盖为教学蓝 ---- */
+  --el-color-primary: #2d6cdf;
+  --el-color-primary-light-3: #5c8de7;
+  --el-color-primary-light-5: #86abef;
+  --el-color-primary-light-7: #b0c8f3;
+  --el-color-primary-light-8: #c7d9f6;
+  --el-color-primary-light-9: #e8f1fd;
+  --el-color-primary-dark-2: #2457b2;
+  --el-border-radius-base: 4px;
+  --el-font-size-base: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--brand);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--brand-hover);
+}
+
+/* ---------- 卡片（白底细边框） ---------- */
+.cc-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.cc-card-hover:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-dark);
+}
+
+/* ---------- 页面容器 ---------- */
+.page-container {
+  padding: 20px 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-main);
+}
+.page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+/* ---------- 主按钮 ---------- */
+.btn-primary {
+  background: var(--brand) !important;
+  border-color: var(--brand) !important;
+  color: #fff !important;
+}
+.btn-primary:hover {
+  background: var(--brand-hover) !important;
+  border-color: var(--brand-hover) !important;
+}
+
+/* ---------- 头像 ---------- */
+.cc-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* ---------- 空状态 ---------- */
+.cc-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* ---------- 滚动条 ---------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cdd5e0;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b6c0cd;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- Element Plus 细节微调（专业、紧凑） ---------- */
+.el-button {
+  font-weight: 500;
+}
+.el-table {
+  --el-table-header-bg-color: #f6f8fb;
+  --el-table-header-text-color: #4a5568;
+  --el-table-border-color: #edf0f4;
+  font-size: 13.5px;
+}
+.el-table th.el-table__cell {
+  font-weight: 600;
+}
+.el-dialog {
+  border-radius: var(--radius-md);
+}
+.el-message-box {
+  border-radius: var(--radius-md);
+}
+.el-tag {
+  border-radius: 3px;
+}
+.el-tabs__item {
+  font-weight: 500;
+}
+
+/* ---------- 动画（克制） ---------- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-in-up {
+  animation: fadeInUp 0.3s ease both;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.animate-pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ---------- Markdown 渲染 ---------- */
+.md-body {
+  line-height: 1.75;
+  font-size: 14px;
+  word-break: break-word;
+}
+.md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+  margin: 1em 0 0.5em;
+  font-weight: 600;
+  color: var(--text-main);
+}
+.md-body p { margin: 0.6em 0; }
+.md-body ul, .md-body ol { padding-left: 1.5em; }
+.md-body code {
+  background: #f0f3f7;
+  color: #c0341d;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.9em;
+}
+.md-body pre {
+  background: #282c34;
+  color: #dcdfe4;
+  padding: 13px 15px;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.md-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.md-body blockquote {
+  border-left: 3px solid var(--brand);
+  background: var(--brand-light);
+  margin: 0.8em 0;
+  padding: 8px 14px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--text-regular);
+}
+.md-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8em 0;
+}
+.md-body th, .md-body td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+}
+.md-body th { background: var(--bg-soft); font-weight: 600; }
+.md-body img { max-width: 100%; border-radius: var(--radius-sm); }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 14px;
+  }
+  .page-title {
+    font-size: 16px;
+  }
+}
