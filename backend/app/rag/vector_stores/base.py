@@ -11,7 +11,7 @@ class BaseVectorStore(LifecycleComponent):
     """
 
     @abstractmethod
-    async def upsert(
+    async def insert(
             self,
             dense_vectors: list[list[float]],
             chunk_texts: list[str],

@@ -37,7 +37,7 @@ class KnowledgeBaseCrud:
         res = await db.exec(stat)
         return res.first()
 
-    async def update_kb_doc_failed_status(self, db: AsyncSession, id: int) -> int:
+    async def update_kb_doc_parsing_status(self, db: AsyncSession, id: int) -> int:
         stat = update(KnowledgeDoc).where(
             KnowledgeDoc.id == id,
             KnowledgeDoc.status == DocumentStatus.FAILED
@@ -50,6 +50,16 @@ class KnowledgeBaseCrud:
         await db.commit()
         return result.rowcount
 
+    async def update_kb_doc_failed_status(self, db: AsyncSession, id: int, error_msg: str):
+        stmt = (
+            update(KnowledgeDoc)
+            .where(KnowledgeDoc.id == id)
+            .values(
+                status=DocumentStatus.FAILED,
+                error_msg=error_msg
+            )
+        )
+        await db.execute(stmt)
 
 
     async def delete_chunk_by_doc_id(self, db: AsyncSession, knowledge_doc_id: int):

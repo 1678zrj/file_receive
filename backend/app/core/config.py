@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     milvus_uri: str
     milvus_token: str
     milvus_collection_name: str
+    # -- 大语言模型API配置 --
+    model_name: str
+    base_url: str
+    api_key: str
 
 
 settings = Settings()

@@ -109,7 +109,7 @@ class RAGIndexService:
             # 这种情况下，两个可以视为同时进行的操作必然进行争夺，因为两个完全相同的请求只有一个可以进行处理
             elif existing_kb_doc.status == DocumentStatus.FAILED:
                 # 这里利用数据库的单行排他锁（即数据库自带锁），通过查看当前更新操作影响的数量来判断谁抢到了
-                row_count = await knowledge_base_crud.update_kb_doc_failed_status(
+                row_count = await knowledge_base_crud.update_kb_doc_parsing_status(
                     self.db,
                     id=existing_kb_doc.id
                 )
@@ -157,6 +157,7 @@ class RAGIndexService:
                     detail="并发创建冲突，该任务已由另一个请求创建并正在处理中"
                 )
         # 执行到这里，前面的一系列权限和并发安全操作都做完了，可以正经写业务代码了
+        doc_id = kb_doc.id
         try:
             # 第一步是文档解析
             # 如果markdown文件已经存在,则可以不用解析,直接读取,否则解析并持久化存储
@@ -201,7 +202,7 @@ class RAGIndexService:
             await self.db.commit()
             # 开始进行向量化
             dense_vectors = await self.embedder.embed_documents(chunk_texts)
-            vector_insert_res = await self.vector_store.upsert(
+            vector_insert_res = await self.vector_store.insert(
                 dense_vectors=dense_vectors,
                 chunk_texts=chunk_texts,
                 knowledge_doc_id=kb_doc.id,
@@ -236,10 +237,20 @@ class RAGIndexService:
             return kb_doc
         except Exception as e:
             await self.db.rollback()
-            kb_doc.status = DocumentStatus.FAILED
-            kb_doc.error_msg = str(e)
-            self.db.add(kb_doc)
-            await self.db.commit()
+            # 这里必须使用doc_id而不是kb_doc.id，因为rollback后kb_doc过期了
+            try:
+                await knowledge_base_crud.update_kb_doc_failed_status(self.db, doc_id, str(e)[:250])
+                await self.db.commit()
+            # 异常捕获，防止连锁异常导致向量数据库中的脏数据没被清理
+            # 不能和e重名，否则会覆盖
+            except Exception as db_error:
+
+                pass
+            try:
+                await self.vector_store.delete_by_doc_id(doc_id)
+            except Exception as vector_error:
+
+                pass
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"知识库构建失败:{str(e)}"

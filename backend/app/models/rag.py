@@ -1,8 +1,8 @@
 import enum
 from datetime import datetime
-from sqlalchemy import UniqueConstraint, Column, Enum, Text
+from sqlalchemy import UniqueConstraint, Column, Enum, Text, BigInteger
 from sqlmodel import SQLModel, Field
-from app.models.base import utc_now
+from app.models.base import utc_now, AwareCreatedAt, AwareUpdatedAt
 
 
 class DocumentStatus(str, enum.Enum):
@@ -45,8 +45,8 @@ class KnowledgeDoc(SQLModel, table=True):
     )
     chunk_count: int = Field(default=0, description="分块总数")
     is_enabled: bool = Field(default=True, description="是否启用检索")
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    created_at: AwareCreatedAt
+    updated_at: AwareUpdatedAt
 
 # 知识库文档文本块是连接向量数据库和知识库文档表的桥梁
 # 一个知识库文档记录可以有多个知识库文档分块记录
@@ -55,11 +55,11 @@ class KnowledgeDocChunk(SQLModel, table=True):
     __tablename__ = "Knowledge_doc_chunk"
     id: int = Field(default=None, primary_key=True)
     knowledge_doc_id: int = Field(foreign_key="knowledge_doc.id", index=True)
-    vector_id: str = Field(description="对应的向量数据库向量id")
+    vector_id: int = Field(sa_type=BigInteger, index=True, description="对应的向量数据库向量id")
     chunk_text: str = Field(sa_column=Column(Text) ,description="对应的文本块内容")
     chunk_index: int = Field(description="在所属文档的连续切片索引，用于连续还原和排序")
     token_count: int = Field(default=0, description="token的切片数量估算")
     is_enabled: bool = Field(default=True, description="单个切片是否启用（用于屏蔽脏数据）")
-    created_at: datetime = Field(default_factory=utc_now)
+    created_at: AwareCreatedAt
 
 

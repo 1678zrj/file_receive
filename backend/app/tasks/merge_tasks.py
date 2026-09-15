@@ -3,14 +3,14 @@ import uuid
 
 import aiofiles.os
 
-from app.core.broker import broker
+from app.core.broker import merge_broker
 from app.crud.upload_crud import upload_crud
 from app.file.local_storage2 import LocalStorage
 from app.file.session_manager import get_session_manager, SessionManager
 from app.file.storage_factory import get_storage
 import asyncio
 from app.file.key_builder import build_tmp_path, build_final_path, build_storage_key
-from app.db.session import AsyncSessionLocal
+from app.db.worker_session import AsyncSessionWorker
 from app.core.config import settings
 from app.redis.redis_client import RedisManager
 from app.schemas.upload_schema import UploadStatus
@@ -47,7 +47,7 @@ async def cleanup_resources(
 
 
 
-@broker.task(task_name="merge_file_task")
+@merge_broker.task(task_name="merge_file_task")
 async def merge_file(
     upload_id: str
 ):
@@ -71,7 +71,7 @@ async def merge_file(
         fake_target_path = Path(f"{true_target_path}.{uuid.uuid4().hex}.tmp")
         # 数据库永远保证兜底校验
         # 1 合并前秒传检测: 若已有记录,直接复用并清理分片
-        async with AsyncSessionLocal() as db:
+        async with AsyncSessionWorker() as db:
             existing_file_record = await upload_crud.get_file_record_by_hash(db, session.file_hash)
             # 说明已经合并完成了,worker可能重复执行
             if existing_file_record is not None:
@@ -98,7 +98,7 @@ async def merge_file(
             temp_merged = False
             target_merged = True
             # 以上操作完成后,可以进行数据库持久化保存了
-            async with AsyncSessionLocal() as db:
+            async with AsyncSessionWorker() as db:
                 try:
                     # 合并成功后将数据插入到数据库
                     file_record = await upload_crud.create_upload(

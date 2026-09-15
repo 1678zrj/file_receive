@@ -1,7 +1,10 @@
+from typing import Annotated, Optional
+
 from sqlmodel import Field, SQLModel
 from datetime import datetime, timezone
-from sqlalchemy import UniqueConstraint, Column, Enum
+from sqlalchemy import UniqueConstraint, Column, Enum, BigInteger, DateTime
 import enum
+
 
 
 # 枚举类型
@@ -11,7 +14,35 @@ class UserRole(int, enum.Enum):
     ADMIN = 2
 
 def utc_now() -> datetime:
+    """生成带有时区信息的当前UTC时间"""
     return datetime.now(timezone.utc)
+
+AwareCreatedAt = Annotated[
+    datetime,
+    Field(
+        default_factory=utc_now,
+        sa_type=DateTime(timezone=True),
+        description="创建时间（UTC）"
+    )
+]
+AwareUpdatedAt = Annotated[
+    datetime,
+    Field(
+        default_factory=utc_now,
+        sa_type=DateTime(timezone=True),
+        # 核心区别：声明当记录发生 UPDATE 且未显式提供该字段值时，自动调用 utc_now 刷新
+        sa_column_kwargs={"onupdate": utc_now},
+        description="更新时间 (UTC)",
+    ),
+]
+AwareNullableDateTime = Annotated[
+    Optional[datetime],
+    Field(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        description="可选时间戳（UTC）"
+    )
+]
 
 # 用户表
 class User(SQLModel, table=True):
@@ -23,7 +54,7 @@ class User(SQLModel, table=True):
     real_name: str
     email: str | None = Field(default= None)
     avatar: str | None = Field(default= None)
-    created_at: datetime = Field(default_factory= utc_now)
+    created_at: AwareCreatedAt
 
 # 课程表
 class Course(SQLModel, table= True):
@@ -33,7 +64,7 @@ class Course(SQLModel, table= True):
     course_code: str | None = Field(default=None, unique=True, index=True,description="课程代码")
     teacher_id: int = Field(foreign_key="user.id",description="创建这门课程的教师id")
     overview: str = Field(default="暂无简介", description="课程简介")
-    created_at: datetime = Field(default_factory= utc_now)
+    created_at: AwareCreatedAt
 
 
 # 选课表
@@ -48,6 +79,7 @@ class Enrollment(SQLModel, table= True):
     # 为了优化相关查询的速度（如统计选课学生人数），索引
     course_id: int = Field(foreign_key="course.id", index=True, description="该门课程的id")
     score: float | None = Field(default= None, description="学生该门课程的分数")
+    created_at: AwareCreatedAt
 
 # 课程资源表（一位老师可以上传多个课程资源，一个课程资源只对应一位老师）
 # （一门课程有多个课程资源，一个课程资源只对应一门课程）
@@ -60,7 +92,7 @@ class CourseResource(SQLModel, table= True):
     uploaded_by: int = Field(foreign_key="user.id",description="上传该资源的老师id")
     file_name: str = Field(description="该文件的原始文件名")
     title: str
-    created_at: datetime = Field(default_factory=utc_now)
+    created_at: AwareCreatedAt
 
 # 作业表(一门课程有多个作业，一个作业只对应一门课程)
 class Assignment(SQLModel, table= True):
@@ -69,8 +101,11 @@ class Assignment(SQLModel, table= True):
     course_id: int = Field(foreign_key= "course.id",description="该作业对应的课程")
     title: str
     description: str
-    deadline: datetime = Field(description="该作业的截止日期")
-    created_at: datetime = Field(default_factory=utc_now, description="该作业的创建日期")
+    # 截止时间通常由外部传入，不设默认生成，但必须带时区
+    deadline: datetime = Field(
+        sa_type=DateTime(timezone=True), description="该作业的截止日期 (UTC)"
+    )
+    created_at: AwareCreatedAt
 
 # 作业附件表
 # 一个作业可以有多个附件，一个附件只对应一个作业
@@ -82,6 +117,7 @@ class AssignmentFile(SQLModel, table= True):
     file_record_id: int = Field(foreign_key="file_record.id", description="附件对应的文件id")
     file_name: str = Field(description="该文件的原始文件名")
     uploaded_by: int = Field(foreign_key="user.id", description="该文件的上传者")
+    created_at: AwareCreatedAt
 
 # 作业提交记录表
 # （一个学生可以有多个提交记录，一个提交记录只对应一个学生）
@@ -93,7 +129,11 @@ class Submission(SQLModel, table= True):
     student_id: int = Field(foreign_key= "user.id", description="提交的学生id")
     assignment_id: int = Field(foreign_key= "assignment.id", description="本次提交对应的作业id")
     score: float | None = Field(default= None,description="本次作业的分数")
-    submitted_at: datetime = Field(default_factory=utc_now, description="作业提交时间")
+    submitted_at: datetime = Field(
+        default_factory=utc_now,
+        sa_type=DateTime(timezone=True),
+        description="作业提交时间 (UTC)",
+    )
     feedback: str | None = Field(default= None, description="批语")
     attempt: int = Field(default= 1, description="表示第几次提交")
 
@@ -109,6 +149,7 @@ class SubmissionFile(SQLModel, table= True):
     file_record_id: int = Field(foreign_key="file_record.id", description="本次提交对应的文件之一的id")
     file_name: str = Field(description="该文件的原始文件名")
     uploaded_by: int = Field(foreign_key="user.id", description="该文件的上传者")
+    created_at: AwareCreatedAt
 
 # 文件记录表
 class FileRecord(SQLModel, table= True):
@@ -118,6 +159,6 @@ class FileRecord(SQLModel, table= True):
     mime_type: str | None = Field(default= None,description="该文件的MIME类型")
     storage_type: str = Field(description="该文件的存储方式：本地 / minio")
     storage_key: str = Field(description="该文件的真实路径")
-    total_size: int = Field(description="该文件的大小，单位字节")
+    total_size: int = Field(sa_type=BigInteger ,description="该文件的大小，单位字节")
     file_hash: str = Field(description="该文件的hash值", unique=True)
-    created_at: datetime = Field(default_factory=utc_now)
+    created_at: AwareCreatedAt
