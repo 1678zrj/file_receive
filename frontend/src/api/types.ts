@@ -521,3 +521,175 @@ export interface NotificationItem {
   course_id?: number
   created_at: string
 }
+
+// ============================================================
+// Agent 问答（后端已实现，流式对话）
+// ============================================================
+
+/** 会话状态 */
+export enum ThreadStatus {
+  ACTIVE = 'active',
+  ARCHIVED = 'archived',
+  DELETED = 'deleted',
+}
+
+/** Run 状态 */
+export enum RunStatus {
+  QUEUED = 'queued',
+  IN_PROGRESS = 'in_progress',
+  REQUIRES_ACTION = 'requires_action',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELED = 'canceled',
+}
+
+/** Agent 会话（Thread） */
+export interface AgentThread {
+  id: string
+  user_id?: number
+  title: string
+  status: ThreadStatus
+  created_at?: string
+  updated_at?: string
+}
+
+/** 创建会话请求 */
+export interface ThreadCreateRequest {
+  title: string
+}
+
+/** 创建会话响应 */
+export interface ThreadCreateResponse {
+  id: string
+  title: string
+  status: string
+}
+
+/** 创建 Run 请求 */
+export interface RunCreateRequest {
+  prompt: string
+  /** 知识库作用域，如 course */
+  scope: string
+  /** 作用域 id，如 course_1 */
+  scope_id: string
+  /** 幂等键，每次新请求生成 uuid，网络重试复用 */
+  idempotency_key: string
+}
+
+/** 创建 Run 响应 */
+export interface RunCreateResponse {
+  thread_id: string
+  run_id: string
+  status: string
+  stream_url: string
+}
+
+/** 恢复中断请求 */
+export interface ResumeRequest {
+  resolution: unknown
+}
+
+/** 恢复中断响应 */
+export interface ResumeResponse {
+  thread_id: string
+  run_id: string
+  status: string
+}
+
+/** 中断提问选项 */
+export interface QuestionOption {
+  label: string
+  description: string
+}
+
+/** 中断提问 */
+export interface AgentQuestion {
+  id: string
+  header: string
+  question: string
+  options: QuestionOption[]
+}
+
+/** requires_action 中断 payload */
+export interface InterruptPayload {
+  interrupt_id: string
+  action_type: string
+  questions: AgentQuestion[]
+}
+
+/** 工具调用 */
+export interface ToolCall {
+  id?: string
+  tool_call_id?: string
+  name?: string
+  args?: Record<string, unknown>
+  status?: string
+  content?: string
+}
+
+/** 历史消息（后端 Message 模型） */
+export interface AgentMessageItem {
+  id: string
+  thread_id: string
+  run_id: string | null
+  role: 'user' | 'assistant'
+  content: string
+  parts?: Array<{ type: string; content?: string; [k: string]: unknown }>
+  tool_calls?: ToolCall[]
+  citations?: unknown[]
+  status: string
+  created_at: string
+}
+
+/** assistant 消息中的有序内容块（对应后端 RunExecutionAccumulator.parts） */
+export interface MessagePart {
+  /** thought=思考内容；text=正文；tool_call=工具调用（结果合并在此块） */
+  type: 'thought' | 'text' | 'tool_call'
+  content?: string
+  /** tool_call 专用 */
+  tool_call_id?: string
+  name?: string
+  args?: Record<string, unknown>
+  status?: string
+}
+
+/** 前端对话中的一条消息（含流式中间态） */
+export interface AgentChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  /** 用户消息正文 */
+  content: string
+  /** assistant 的有序内容块（思考 / 正文 / 工具调用，按发生顺序排列） */
+  parts: MessagePart[]
+  /** 是否正在流式输出 */
+  streaming: boolean
+  /** 待用户回答的中断（assistant 消息上挂载） */
+  interrupt?: InterruptPayload | null
+  /** 本条消息使用的知识库标签（如课程名），用于展示 */
+  scopeLabel?: string
+  /** 本条消息所属的后端 Run id（用于刷新后重新连接 stream 重放） */
+  runId?: string
+  created_at: string
+}
+
+/** 前端的一个 Agent 会话（对应后端一个 Thread） */
+export interface ChatSession {
+  /** 本地会话 id（新建时生成） */
+  id: string
+  /** 会话标题（取首条提问） */
+  title: string
+  /** 后端 Thread id（首次 send 后由后端返回并赋值） */
+  threadId: string | null
+  /** 该会话的消息列表 */
+  messages: AgentChatMessage[]
+  /** 该会话当前活跃的 Run id（刷新后用于重连 stream） */
+  currentRunId: string | null
+  /** 当前 run 是否已收到终态事件（completed/failed/canceled） */
+  runFinished: boolean
+  /** 该会话是否正在流式输出（各会话独立，可并发） */
+  streaming: boolean
+  /** 该会话挂起的中断 */
+  pendingInterrupt: InterruptPayload | null
+  createdAt: number
+  updatedAt: number
+}

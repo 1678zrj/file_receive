@@ -30,6 +30,8 @@ import {
 } from './mock'
 import type {
   AccessToken,
+  AgentMessageItem,
+  AgentThread,
   Announcement,
   AnnouncementCreate,
   Assignment,
@@ -57,11 +59,15 @@ import type {
   MyCourseGrade,
   NotificationItem,
   PageResponse,
+  RunCreateRequest,
+  RunCreateResponse,
+  ResumeResponse,
   StatsOverview,
   Submission,
   SubmissionCreate,
   SubmissionGrade,
   SubmissionWithStudent,
+  ThreadCreateResponse,
   Token,
   UploadStatusResponse,
   UserCreate,
@@ -610,6 +616,40 @@ export const notificationApi = {
       return mockDelay({ ok: true })
     }
     return http.post('/notifications/read-all').then((r) => r.data)
+  },
+}
+
+// ============================================================
+// Agent 问答（后端已实现，流式对话）
+// ============================================================
+export const agentApi = {
+  /** POST /agent/thread 创建会话 */
+  createThread(data: { title: string }) {
+    return http.post<ThreadCreateResponse>('/agent/thread', data).then((r) => r.data)
+  },
+  /** POST /agent/threads/{thread_id}/run 发起一轮对话 */
+  createRun(threadId: string, data: RunCreateRequest) {
+    return http.post<RunCreateResponse>(`/agent/threads/${threadId}/run`, data).then((r) => r.data)
+  },
+  /** POST /agent/threads/{thread_id}/runs/{run_id}/resume 回复中断 */
+  resumeRun(threadId: string, runId: string, resolution: unknown) {
+    return http
+      .post<ResumeResponse>(`/agent/threads/${threadId}/runs/${runId}/resume`, { resolution })
+      .then((r) => r.data)
+  },
+  /** GET /agent/threads/{thread_id}/runs/{run_id}/stream SSE 流（用 sse.ts 的 streamSSE） */
+  streamUrl(threadId: string, runId: string) {
+    return `/api/v1/agent/threads/${threadId}/runs/${runId}/stream`
+  },
+
+  // ---------------- [TODO-API] 后端尚未提供 ----------------
+  /** [TODO-API] GET /agent/threads 会话列表 */
+  listThreads() {
+    return http.get<AgentThread[]>('/agent/threads').then((r) => r.data)
+  },
+  /** [TODO-API] GET /agent/threads/{thread_id}/messages 历史消息 */
+  listMessages(threadId: string) {
+    return http.get<AgentMessageItem[]>(`/agent/threads/${threadId}/messages`).then((r) => r.data)
   },
 }
 
