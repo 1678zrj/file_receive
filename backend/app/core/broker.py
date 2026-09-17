@@ -41,6 +41,16 @@ from app.core.config import settings
 from app.core.rag_deps import rag_container
 from app.redis.redis_client import RedisManager
 
+
+"""
+    定义两个broker是为了做到资源隔离，
+    比如merge_broker只需要Redis客户端
+    而agent_broker还需要rag_container
+    实际上真正做到两个worker的隔离靠的是指定queue_name
+    不指定queue_name就默认到同一个消息队列中，队列名默认是taskiq
+    这就会导致merge_worker和agent_worker
+    从同一个消息队列中抢不属于它们的任务
+"""
 # 1. 专门处理文件合并的 Broker
 merge_broker = ListQueueBroker(
     settings.redis_url,

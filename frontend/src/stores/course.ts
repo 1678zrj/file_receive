@@ -19,11 +19,27 @@ interface CourseState {
   loading: boolean
   /** 列表接口是否缺失（后端未提供时为 true，页面展示占位提示） */
   listApiMissing: boolean
+  /** 加载课程列表时的错误信息（非「接口缺失」类错误） */
+  loadError: string
 }
 
 function isMissingApi(e: unknown): boolean {
   const err = e as ApiError
   return err.status === 404 || err.status === 405
+}
+
+/**
+ * 按角色挑选「可选课程」。
+ * `CourseSelector` 与「首次进入默认选中第一门课」共用这一份逻辑，避免两处漂移
+ * （出现「下拉里没有这门课、但默认又选中了它」这种情况）。
+ */
+export function pickCoursesForRole(
+  role: UserRole | undefined,
+  lists: { teaching: CourseResponse[]; enrolled: CourseResponse[]; allList: CourseResponse[] },
+): CourseResponse[] {
+  if (role === UserRole.ADMIN) return lists.allList
+  if (role === UserRole.TEACHER) return lists.teaching
+  return lists.enrolled
 }
 
 export const useCourseStore = defineStore('course', {
@@ -33,6 +49,7 @@ export const useCourseStore = defineStore('course', {
     allList: [],
     loading: false,
     listApiMissing: false,
+    loadError: '',
   }),
   getters: {
     /** 全部可见课程（我教的 + 我学的 + 全局所有课，按 id 去重） */
@@ -58,9 +75,28 @@ export const useCourseStore = defineStore('course', {
     async refreshMyCourses(role: UserRole) {
       this.loading = true
       this.listApiMissing = false
+      this.loadError = ''
       this.teaching = []
       this.enrolled = []
       this.allList = []
+      /*
+       * ⚠️ 这里**不允许把错误抛给调用方**。
+       * 之前每个 job 在非 404/405 时会 `throw e`，Promise.all 于是 reject，
+       * 而多处调用方是 `await courseStore.refreshMyCourses(...)` 且没有 try/catch，
+       * 结果一个课程接口的偶发错误（500/断网）会把 await 之后的所有初始化一起跳过：
+       *  - QaView：会话深链定位、?topic= 自动提问全部不执行
+       *  - CourseCenterView：enrolledIds 不会被赋值 → 所有课程都显示成「未选」
+       * 现在统一改成记录到 loadError，调用方永远不会被打断。
+       */
+      const record = (e: unknown) => {
+        if (isMissingApi(e)) {
+          this.listApiMissing = true
+          return
+        }
+        const msg = (e as ApiError)?.message || '课程列表加载失败'
+        if (!this.loadError) this.loadError = msg
+        console.error('[course] 课程列表加载失败：', e)
+      }
       try {
         const jobs: Promise<void>[] = []
 
@@ -72,10 +108,7 @@ export const useCourseStore = defineStore('course', {
               .then((res) => {
                 this.allList = res.items || []
               })
-              .catch((e) => {
-                if (isMissingApi(e)) this.listApiMissing = true
-                else throw e
-              }),
+              .catch(record),
           )
         } else {
           if (role === UserRole.TEACHER) {
@@ -85,10 +118,7 @@ export const useCourseStore = defineStore('course', {
                 .then((list) => {
                   this.teaching = list || []
                 })
-                .catch((e) => {
-                  if (isMissingApi(e)) this.listApiMissing = true
-                  else throw e
-                }),
+                .catch(record),
             )
           }
           jobs.push(
@@ -97,10 +127,7 @@ export const useCourseStore = defineStore('course', {
               .then((list) => {
                 this.enrolled = list || []
               })
-              .catch((e) => {
-                if (isMissingApi(e)) this.listApiMissing = true
-                else throw e
-              }),
+              .catch(record),
           )
         }
         await Promise.all(jobs)

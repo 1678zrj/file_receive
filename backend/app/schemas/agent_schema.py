@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 from typing import Any
@@ -58,3 +59,28 @@ class ResumeResponse(BaseModel):
     thread_id: uuid.UUID
     run_id: uuid.UUID
     status: str
+
+class SingleThreadResponse(BaseModel):
+    id: uuid.UUID
+    user_id: int
+    title: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+class ListThreadResponse(BaseModel):
+    threads: list[SingleThreadResponse]
+
+class SingleMessageResponse(BaseModel):
+    id: uuid.UUID
+    run_id: uuid.UUID
+    role: str
+    content: str
+    parts: list[dict[str, Any]] | None
+    tool_calls: list[dict[str, Any]] | None
+    citations: list[dict[str, Any]] | None
+    status: str
+    created_at: datetime
+    resolved_at: datetime | None
+
+class ThreadMessageResponse(BaseModel):
+    messages: list[SingleMessageResponse]

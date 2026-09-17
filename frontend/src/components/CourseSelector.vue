@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useCourseStore } from '@/stores/course'
+import { pickCoursesForRole, useCourseStore } from '@/stores/course'
 import type { CourseResponse } from '@/api/types'
 
 const props = defineProps<{ modelValue: number | null }>()
@@ -38,11 +38,13 @@ onMounted(async () => {
 })
 
 /** 可选的课程：教师＝我教的课；管理员＝所有课程；学生＝我学的课 */
-const courses = computed<CourseResponse[]>(() => {
-  if (auth.isAdmin) return courseStore.allList
-  if (auth.isTeacher) return courseStore.teaching
-  return courseStore.enrolled
-})
+const courses = computed<CourseResponse[]>(() =>
+  pickCoursesForRole(auth.user?.role, {
+    teaching: courseStore.teaching,
+    enrolled: courseStore.enrolled,
+    allList: courseStore.allList,
+  }),
+)
 
 function onChange(v: number | null) {
   emit('update:modelValue', v)

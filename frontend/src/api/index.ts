@@ -55,6 +55,7 @@ import type {
   KBChatResponse,
   KnowledgeDocChunkItem,
   KnowledgeDocItem,
+  ListThreadResponse,
   MergeTriggerResponse,
   MyCourseGrade,
   NotificationItem,
@@ -68,6 +69,7 @@ import type {
   SubmissionGrade,
   SubmissionWithStudent,
   ThreadCreateResponse,
+  ThreadMessageResponse,
   Token,
   UploadStatusResponse,
   UserCreate,
@@ -642,14 +644,47 @@ export const agentApi = {
     return `/api/v1/agent/threads/${threadId}/runs/${runId}/stream`
   },
 
-  // ---------------- [TODO-API] 后端尚未提供 ----------------
-  /** [TODO-API] GET /agent/threads 会话列表 */
+  // ---------------- 会话列表 / 历史消息 / 删除会话（后端已提供） ----------------
+  /**
+   * GET /agent/threads 当前用户的**活跃**会话列表（后端已过滤 `status='active'`，按 updated_at 倒序，无分页）
+   *
+   * 后端实现为 `response_model=list[SingleThreadResponse]`，返回**裸数组**；
+   * 这里对「裸数组」与「`{threads:[...]}` 包装对象」都做了兼容。
+   */
   listThreads() {
-    return http.get<AgentThread[]>('/agent/threads').then((r) => r.data)
+    return http
+      .get<ListThreadResponse | AgentThread[]>('/agent/threads')
+      .then((r): AgentThread[] => {
+        const d: any = r.data
+        return Array.isArray(d) ? (d as AgentThread[]) : ((d?.threads ?? []) as AgentThread[])
+      })
   },
-  /** [TODO-API] GET /agent/threads/{thread_id}/messages 历史消息 */
+  /**
+   * GET /agent/threads/{thread_id}/messages 会话历史消息（按 created_at 升序，裸数组）
+   * - 404：thread 不存在
+   * - 401：不是该 thread 的所有者
+   * - 409：thread 不是 active 状态
+   *
+   * 注意：run 进行中也会返回一条 `status="pending"` 的 assistant 消息（worker 每隔一段时间增量落库 parts）。
+   */
   listMessages(threadId: string) {
-    return http.get<AgentMessageItem[]>(`/agent/threads/${threadId}/messages`).then((r) => r.data)
+    return http
+      .get<ThreadMessageResponse | AgentMessageItem[]>(`/agent/threads/${threadId}/messages`)
+      .then((r): AgentMessageItem[] => {
+        const d: any = r.data
+        return Array.isArray(d)
+          ? (d as AgentMessageItem[])
+          : ((d?.messages ?? []) as AgentMessageItem[])
+      })
+  },
+  /**
+   * DELETE /agent/threads/{thread_id} 删除会话（后端为**软删除**：`status='deleted'`）
+   * - 404：会话不存在
+   * - 401：无权删除（不是本人）
+   * - 幂等：已是非 active 状态时后端直接 return，仍返回 200
+   */
+  deleteThread(threadId: string) {
+    return http.delete(`/agent/threads/${threadId}`).then((r) => r.data)
   },
 }
 

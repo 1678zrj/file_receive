@@ -128,6 +128,11 @@ function onFilesPicked(e: Event) {
 /**
  * 监听本课程资源上传完成，自动用「文件名（去扩展名）」作为标题绑定到课程，
  * 无需弹窗确认，全程后台。
+ *
+ * `immediate: true` 是必须的：上传是后台任务，老师完全可能在上传完成前就离开本页
+ * （上传中心的提示就是「不必停留在上传页」）。若只在任务变化时触发，
+ * 回来时既不会补绑（挂载不触发 watcher），那些文件就会「传上去了但没进课程资源」。
+ * 加上 immediate 后，每次进入本页都会先把「已完成但未绑定」的任务补绑一次。
  */
 watch(
   () =>
@@ -151,8 +156,6 @@ watch(
     )
     if (completed.length === 0) return
     for (const t of completed) {
-      handledIds.add(t.id)
-      uploadStore.remove(t.id)
       try {
         await resourceApi.create({
           course_id: props.courseId,
@@ -160,14 +163,23 @@ watch(
           file_name: t.fileName,
           title: t.fileName.replace(/\.[^.]+$/, ''),
         })
+        // 绑定成功才移出队列并标记已处理
+        handledIds.add(t.id)
+        uploadStore.remove(t.id)
         ElMessage.success(`「${t.fileName}」已添加到课程资源`)
       } catch (e: any) {
-        ElMessage.error(e?.message || `「${t.fileName}」添加失败`)
+        /*
+         * 文件本身已经上传成功（有 fileRecordId），只是「绑定成课程资源」失败了。
+         * 这里**不能**把任务移出队列，否则这个文件就再也没机会被绑定了；
+         * 保留它，下次任务变化或重新进入本页时会自动重试。
+         * （失败不会自我循环：绑定失败并不改动 uploadStore.tasks，watcher 不会再被触发。）
+         */
+        ElMessage.error(`「${t.fileName}」添加失败：${e?.message || '未知错误'}（稍后会自动重试）`)
       }
     }
     await load()
   },
-  { deep: true },
+  { deep: true, immediate: true },
 )
 
 function previewable(name: string) {

@@ -38,10 +38,10 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { InterruptPayload } from '@/api/types'
+import type { InterruptAnswerInput, InterruptPayload } from '@/api/types'
 
 const props = defineProps<{ interrupt: InterruptPayload }>()
-const emit = defineEmits<{ submit: [answers: Array<{ id: string; selected: string[] }>] }>()
+const emit = defineEmits<{ submit: [answers: InterruptAnswerInput[]] }>()
 
 const answers = reactive<Record<string, string | string[]>>({})
 const submitting = ref(false)
@@ -54,7 +54,7 @@ props.interrupt.questions.forEach((q) => {
 })
 
 function submit() {
-  const result: Array<{ id: string; selected: string[] }> = []
+  const result: InterruptAnswerInput[] = []
   for (const q of props.interrupt.questions) {
     const val = answers[q.id]
     if (val == null || val === '') {

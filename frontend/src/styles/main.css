@@ -282,6 +282,49 @@ a:hover {
 .md-body th { background: var(--bg-soft); font-weight: 600; }
 .md-body img { max-width: 100%; border-radius: var(--radius-sm); }
 
+/* 代码块 + 复制按钮（v-html 注入的节点，样式必须放全局） */
+.md-code {
+  position: relative;
+  margin: 0.8em 0;
+}
+.md-code pre {
+  margin: 0;
+}
+.md-code[data-lang]::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  font-size: 11px;
+  color: #8b93a7;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  pointer-events: none;
+  user-select: none;
+}
+.md-code-copy {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  z-index: 1;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: #b9c0d0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.md-code:hover .md-code-copy {
+  opacity: 1;
+}
+.md-code-copy:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
   .page-container {

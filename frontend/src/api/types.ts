@@ -543,14 +543,24 @@ export enum RunStatus {
   CANCELED = 'canceled',
 }
 
-/** Agent 会话（Thread） */
+/** Agent 会话（Thread）—— 对齐后端 SingleThreadResponse */
 export interface AgentThread {
   id: string
-  user_id?: number
+  user_id: number
   title: string
-  status: ThreadStatus
-  created_at?: string
-  updated_at?: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * GET /agent/threads 响应包装体
+ *
+ * ⚠️ 后端当前实现是 `response_model=list[SingleThreadResponse]`，**直接返回裸数组**。
+ * 这里保留包装体是为了兼容「万一改回 `{threads:[...]}`」的写法，`agentApi` 两种都认。
+ */
+export interface ListThreadResponse {
+  threads: AgentThread[]
 }
 
 /** 创建会话请求 */
@@ -627,30 +637,115 @@ export interface ToolCall {
   content?: string
 }
 
-/** 历史消息（后端 Message 模型） */
-export interface AgentMessageItem {
-  id: string
-  thread_id: string
-  run_id: string | null
-  role: 'user' | 'assistant'
-  content: string
-  parts?: Array<{ type: string; content?: string; [k: string]: unknown }>
-  tool_calls?: ToolCall[]
-  citations?: unknown[]
-  status: string
-  created_at: string
-}
-
-/** assistant 消息中的有序内容块（对应后端 RunExecutionAccumulator.parts） */
-export interface MessagePart {
-  /** thought=思考内容；text=正文；tool_call=工具调用（结果合并在此块） */
-  type: 'thought' | 'text' | 'tool_call'
+/** 后端持久化的内容块（RunExecutionAccumulator.parts 原样落库） */
+export interface BackendMessagePart {
+  /** thought=思考；text=正文；tool_call=工具调用；tool_result=工具返回 */
+  type: 'thought' | 'text' | 'tool_call' | 'tool_result' | string
   content?: string
-  /** tool_call 专用 */
+  /** thought / text / tool_call / tool_result 通用 */
   tool_call_id?: string
   name?: string
   args?: Record<string, unknown>
   status?: string
+}
+
+/**
+ * 历史消息 —— 对齐后端 SingleMessageResponse
+ *
+ * `run_id` 会用于把历史消息关联到具体 Run（刷新后重新连接该 Run 的 SSE 时定位承载消息）。
+ * 模型层 `Message.run_id` 可空，这里按可空处理做防御。
+ */
+export interface AgentMessageItem {
+  id: string
+  run_id?: string | null
+  role: 'user' | 'assistant' | string
+  content: string
+  parts?: BackendMessagePart[] | null
+  tool_calls?: ToolCall[] | null
+  citations?: unknown[] | null
+  /**
+   * 该消息所属 Run 的知识库作用域。
+   *
+   * ⚠️ 后端目前**尚未返回**这两个字段（`SingleMessageResponse` 里没有），
+   * 所以从服务端加载的历史消息拿不到「用了哪个课程知识库」，对话里那个
+   * 「📚 课程名」标签会消失（只有本次页面内自己发的消息才有）。
+   * 数据本来就在 Run 表上（`Message.run_id → Run.scope / Run.scope_id`），
+   * 后端补上后前端**无需再改代码**即可显示（见 useAgentChat 的 resolveScopeLabel）。
+   */
+  scope?: string | null
+  scope_id?: string | null
+  /** 落库状态：pending | success | failed（模型注释里还有 in_progress/requires_action/cancelled） */
+  status: string
+  created_at: string
+  resolved_at?: string | null
+}
+
+/**
+ * GET /agent/threads/{thread_id}/messages 响应包装体
+ *
+ * ⚠️ 后端当前实现是 `response_model=list[SingleMessageResponse]`，**直接返回裸数组**（按 created_at 升序）。
+ * 保留包装体仅为兼容 `{messages:[...]}` 写法。
+ */
+export interface ThreadMessageResponse {
+  messages: AgentMessageItem[]
+}
+
+/** assistant 消息中的有序内容块（对应后端 RunExecutionAccumulator.parts） */
+export interface MessagePart {
+  /**
+   * thought=思考内容；text=正文；tool_call=工具调用（结果合并在此块）；
+   * interrupt=向用户提问/已回复（前端插入，见 useAgentChat 的 requires_action 处理）
+   */
+  type: 'thought' | 'text' | 'tool_call' | 'interrupt'
+  content?: string
+  /**
+   * tool_call 专用；
+   * interrupt 块也会带上它（记录「中断是从哪次 tool_call 产生的」），
+   * 用来和历史里的 tool_result 配对，从而还原用户的回答。
+   */
+  tool_call_id?: string
+  name?: string
+  args?: Record<string, unknown>
+  status?: string
+  /** interrupt 专用：待用户回答的问题 */
+  interrupt?: InterruptPayload
+  /**
+   * interrupt 专用：用户已提交的回答。
+   *
+   * ⚠️ 必须挂在 parts 里（而不是消息顶层）—— 它是时间轴的一部分：
+   * 中断发生在某一步，回答之后模型还会继续输出，所以「已回复」卡片必须留在原位，
+   * 否则新输出会跑到它下面，看起来就像卡片一直贴在最底部。
+   */
+  answers?: InterruptAnswer[]
+}
+
+/**
+ * 提交给后端的中断回答（`InterruptForm` 的 emit 格式，也是 resume 的 resolution 格式）。
+ * 后端 `ask_user_question` 工具拿到的就是这个数组。
+ */
+export interface InterruptAnswerInput {
+  /** 对应 AgentQuestion.id */
+  id: string
+  selected: string[]
+}
+
+/** 用户对某个中断问题的回答（本地留存，用于在对话里回显「你选择了…」） */
+export interface InterruptAnswer {
+  /** 对应 AgentQuestion.id */
+  id: string
+  /** 展示用的问题文本（header 优先） */
+  question: string
+  selected: string[]
+}
+
+/** 可重试的发送信息：createRun 失败时留在消息上，重试时复用同一个幂等键 */
+export interface RetryPayload {
+  text: string
+  /** 必须复用：后端据此保证「同一请求只会创建一个 Run」 */
+  idempotencyKey: string
+  scope: string
+  scope_id: string
+  scopeLabel?: string
 }
 
 /** 前端对话中的一条消息（含流式中间态） */
@@ -663,8 +758,10 @@ export interface AgentChatMessage {
   parts: MessagePart[]
   /** 是否正在流式输出 */
   streaming: boolean
-  /** 待用户回答的中断（assistant 消息上挂载） */
+  /** 待用户回答的中断（assistant 消息上挂载，用于 resume 流程） */
   interrupt?: InterruptPayload | null
+  /** 发送失败后可重试的信息；成功后清空 */
+  retry?: RetryPayload
   /** 本条消息使用的知识库标签（如课程名），用于展示 */
   scopeLabel?: string
   /** 本条消息所属的后端 Run id（用于刷新后重新连接 stream 重放） */
@@ -674,14 +771,16 @@ export interface AgentChatMessage {
 
 /** 前端的一个 Agent 会话（对应后端一个 Thread） */
 export interface ChatSession {
-  /** 本地会话 id（新建时生成） */
+  /** 本地会话 id（新建时生成；由后端 thread 恢复时用 thread-<id>） */
   id: string
-  /** 会话标题（取首条提问） */
+  /** 会话标题（服务端 thread 标题优先） */
   title: string
   /** 后端 Thread id（首次 send 后由后端返回并赋值） */
   threadId: string | null
   /** 该会话的消息列表 */
   messages: AgentChatMessage[]
+  /** 历史消息是否已从后端加载过（false = 仅有会话骨架，切换时懒加载） */
+  loaded: boolean
   /** 该会话当前活跃的 Run id（刷新后用于重连 stream） */
   currentRunId: string | null
   /** 当前 run 是否已收到终态事件（completed/failed/canceled） */
@@ -690,6 +789,20 @@ export interface ChatSession {
   streaming: boolean
   /** 该会话挂起的中断 */
   pendingInterrupt: InterruptPayload | null
+  /** 是否已收到 in_progress / 首个事件（用于区分「排队中」与「执行中」） */
+  started?: boolean
+  /** 最近一次收到事件或心跳的时间戳（存活检测） */
+  lastEventAt?: number
+  /** 断线重连尝试次数（>0 表示正在重连） */
+  reconnecting?: number
+  /** 用户主动停止了接收 */
+  stopped?: boolean
+  /**
+   * runId → 该轮中断的回答。
+   * 后端历史接口不返回 interrupt 的 resolution，所以这里本地留存，
+   * 刷新后靠 server 消息里的 run_id 重新挂回去。
+   */
+  interruptAnswers?: Record<string, InterruptAnswer[]>
   createdAt: number
   updatedAt: number
 }

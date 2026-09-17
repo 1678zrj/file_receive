@@ -15,8 +15,9 @@ from sqlmodel import select
 from app.crud.thread_crud import thread_crud
 from app.crud.run_crud import run_crud
 from app.crud.message_crud import message_crud
+from app.services.message_service import MessageService, get_message_service
 from app.tasks.agent_tasks import execute_agent_run
-from app.schemas.agent_schema import ResumeRequest, ResumeResponse
+from app.schemas.agent_schema import ResumeRequest, ResumeResponse, SingleMessageResponse, SingleThreadResponse
 from app.crud.interrupt_crud import interrupt_crud
 from app.models.agent import InterruptStatus
 from app.db.session import AsyncSessionLocal
@@ -24,6 +25,7 @@ import json
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 from collections.abc import AsyncGenerator
+from app.services.thread_service import get_thread_service, ThreadService
 
 
 
@@ -586,3 +588,42 @@ async def stream_run(
             "X-Accel-Buffering": "no"
         }
     )
+
+
+
+@router.get("/threads", response_model=list[SingleThreadResponse])
+async def list_threads(
+    thread_service: ThreadService = Depends(get_thread_service),
+    current_user: User = Depends(get_current_user)
+):
+    user_threads = await thread_service.list_threads(user_id=current_user.id)
+    return user_threads
+
+
+@router.get("/threads/{thread_id}/messages", response_model=list[SingleMessageResponse])
+async def get_thread_messages(
+    thread_id: uuid.UUID,
+    message_service: MessageService = Depends(get_message_service),
+    current_user: User = Depends(get_current_user)
+):
+    thread_messages = await message_service.get_thread_messages(
+        thread_id,
+        current_user.id
+    )
+    return thread_messages
+
+
+@router.delete(
+    "/threads/{thread_id}"
+)
+async def delete_thread(
+    thread_id: uuid.UUID,
+    thread_service: ThreadService = Depends(get_thread_service),
+    current_user: User = Depends(get_current_user)
+):
+    await thread_service.delete_thread(
+        thread_id,
+        current_user.id
+    )
+
+

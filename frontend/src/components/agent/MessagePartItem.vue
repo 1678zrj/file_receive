@@ -12,7 +12,12 @@
     <div v-if="!collapsed" class="part-thought-body">{{ part.content }}</div>
   </div>
 
-  <div v-if="part.type === 'text'" class="part part-text md-body" v-html="renderedText"></div>
+  <div
+    v-if="part.type === 'text'"
+    class="part part-text md-body"
+    v-html="renderedText"
+    @click="onContentClick"
+  ></div>
 
   <div v-if="part.type === 'tool_call'" class="part part-tool">
     <div class="part-head" @click="collapsed = !collapsed">
@@ -33,18 +38,98 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { View, ArrowDown, ArrowUp, Loading, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
 import type { MessagePart } from '@/api/types'
 import { renderMarkdown } from '@/utils/markdown'
+import { copyText } from '@/utils/clipboard'
 
-const props = defineProps<{ part: MessagePart }>()
+const props = defineProps<{
+  part: MessagePart
+  /** 所属消息是否正在流式输出（流式中做节流渲染 + 关闭代码高亮） */
+  streaming?: boolean
+  /** 初始是否折叠（历史消息默认折叠，流式中的新块默认展开） */
+  defaultCollapsed?: boolean
+}>()
 
-/** 折叠状态（默认展开） */
-const collapsed = ref(false)
+/** 折叠状态。默认展开，但历史消息会以折叠态起步，避免满屏思考过程 */
+const collapsed = ref(!!props.defaultCollapsed)
 
-const renderedText = computed(() => renderMarkdown(props.part.content || ''))
+/**
+ * 正文渲染节流策略。
+ *
+ * 背景：SSE 每个 token 都会改 part.content。改造前每次都全量跑 markdown-it + highlight.js，
+ * 一段 N 字的回答会做 O(N²) 的解析工作（这是真正贵的地方）。
+ *
+ * 但节流间隔不能一刀切：间隔太大（试过 120ms ≈ 8 次/秒）虽然省 CPU，
+ * 肉眼会觉得文字「一段一段蹦出来」，反而不如以前流畅。
+ * 所以按内容长度分档：
+ *  - 短内容（绝大多数回答）：按帧渲染（16ms），观感和改造前一致；
+ *  - 长内容：放宽到 48ms，避免 O(N) 解析在长回答上占满主线程。
+ * 另外流式期间**关掉代码高亮**（highlight.js 是最贵的一步），终态再做一次带高亮的完整渲染。
+ */
+const SHORT_CONTENT_CHARS = 3000
+const FRAME_INTERVAL = 16
+const LONG_CONTENT_INTERVAL = 48
 
+function renderInterval(len: number): number {
+  return len <= SHORT_CONTENT_CHARS ? FRAME_INTERVAL : LONG_CONTENT_INTERVAL
+}
+
+const renderedText = ref('')
+let lastRenderAt = 0
+let timer: ReturnType<typeof setTimeout> | null = null
+
+function renderNow(highlight: boolean) {
+  renderedText.value = renderMarkdown(props.part.content || '', { highlight })
+  lastRenderAt = Date.now()
+}
+
+function scheduleRender(delay: number) {
+  if (timer) return
+  timer = setTimeout(() => {
+    timer = null
+    renderNow(!props.streaming)
+  }, delay)
+}
+
+watch(
+  () => props.part.content,
+  () => {
+    // 只有正文块需要渲染 markdown；思考块/工具块是纯文本
+    if (props.part.type !== 'text') return
+    if (!props.streaming) {
+      // 非流式（历史消息 / 定稿）：直接完整渲染
+      renderNow(true)
+      return
+    }
+    const interval = renderInterval((props.part.content || '').length)
+    const elapsed = Date.now() - lastRenderAt
+    if (elapsed >= interval) renderNow(false)
+    else scheduleRender(interval - elapsed)
+  },
+  { immediate: true },
+)
+
+// 流式结束 → 立刻补一次带高亮的完整渲染
+watch(
+  () => props.streaming,
+  (now, before) => {
+    if (before && !now) {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+      if (props.part.type === 'text') renderNow(true)
+    }
+  },
+)
+
+onUnmounted(() => {
+  if (timer) clearTimeout(timer)
+})
+
+/** 下面几个都是 computed（惰性）：只有真正渲染到时才算，不会随每个 token 重算 */
 const preview = computed(() => {
   const t = (props.part.content || '').replace(/\s+/g, ' ')
   return t.length > 50 ? `${t.slice(0, 50)}…` : t
@@ -68,6 +153,26 @@ const toolLabel = computed(() => {
   if (n === 'ask_user_question') return '向用户提问'
   return n
 })
+
+/**
+ * 代码块复制按钮的点击处理（事件委托）。
+ * 按钮是 markdown 渲染出来的 HTML（v-html 注入），没法给它绑 Vue 事件，
+ * 所以在容器上委托；代码内容直接从同级的 <code> 读，不用把代码塞进属性里。
+ */
+async function onContentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement | null
+  const btn = target?.closest?.('.md-code-copy') as HTMLElement | null
+  if (!btn) return
+  const code = btn.parentElement?.querySelector('code')?.textContent ?? ''
+  if (!code) return
+  const ok = await copyText(code)
+  const original = btn.dataset.label || '复制'
+  btn.dataset.label = original
+  btn.textContent = ok ? '已复制' : '复制失败'
+  setTimeout(() => {
+    btn.textContent = original
+  }, 1400)
+}
 </script>
 
 <style scoped>

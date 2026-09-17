@@ -344,10 +344,17 @@ function onFilePicked(e: Event) {
   ElMessage.success(`「${f.name}」已进入后台上传队列，上传完成后会自动进入索引设置`)
 }
 
-/** 监听本课程知识库文件上传完成，自动打开索引设置 */
+/**
+ * 监听本课程知识库文件上传完成，自动打开索引设置。
+ *
+ * `immediate: true`：上传在后台跑，用户可能中途离开本页；离开期间完成的上传
+ * 若不在挂载时补一次检查，就永远不会弹出索引设置（文件传上去了却没进知识库）。
+ * 每次进入本页都会先把「已完成但还没索引」的上传补上。
+ */
 watch(
   () => uploadStore.tasks.map((t) => ({ id: t.id, status: t.status, source: t.source, courseId: t.courseId, fileRecordId: t.fileRecordId, fileName: t.fileName })),
   () => {
+    if (selectedCourseId.value == null) return
     for (const t of uploadStore.tasks) {
       if (t.source !== 'kb_doc' || t.courseId !== selectedCourseId.value) continue
       if (t.status !== 'completed' || t.fileRecordId == null) continue
@@ -359,7 +366,7 @@ watch(
       break
     }
   },
-  { deep: true },
+  { deep: true, immediate: true },
 )
 
 async function doIndex() {

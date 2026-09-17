@@ -58,7 +58,8 @@
               <template v-if="isActive(t)">
                 <el-button text type="danger" size="small" @click="store.cancel(t.id)">取消</el-button>
               </template>
-              <template v-if="t.status === 'completed' || (t.status === 'failed' && !t.file)">
+              <!-- 终态都允许移除：取消/失败后如果还留着文件引用，也要能清理掉 -->
+              <template v-if="!isActive(t)">
                 <el-button text size="small" @click="store.remove(t.id)">移除</el-button>
               </template>
               <!-- 完成后可执行后续动作（如资源绑定标题） -->

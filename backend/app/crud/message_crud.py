@@ -34,4 +34,20 @@ class MessageCrud:
         result = await db.exec(stmt)
         return result.first()
 
+    async def get_thread_messages(
+            self,
+            db: AsyncSession,
+            thread_id: uuid.UUID
+    ) -> list[Message]:
+        stmt = select(Message).where(
+            Message.thread_id == thread_id
+        ).order_by(
+            # 时间尺度上，越早的越小
+            # 升序排序，越往下时间尺度越大，消息越新
+            Message.created_at.asc()
+        )
+        result = await db.exec(stmt)
+        return result.all()
+
+
 message_crud = MessageCrud()
