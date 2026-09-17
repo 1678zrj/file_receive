@@ -229,38 +229,71 @@ a:hover {
 
 /* ---------- Markdown 渲染 ---------- */
 .md-body {
-  line-height: 1.75;
-  font-size: 14px;
+  line-height: 1.8;
+  font-size: 15px;
   word-break: break-word;
+  /* 中文正文更耐看；避免标点出现在行首 */
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
+/* 首尾外边距归零：否则气泡/卡片里会多出无意义的空白 */
+.md-body > :first-child { margin-top: 0; }
+.md-body > :last-child { margin-bottom: 0; }
 .md-body h1, .md-body h2, .md-body h3, .md-body h4 {
-  margin: 1em 0 0.5em;
+  margin: 1.15em 0 0.5em;
   font-weight: 600;
   color: var(--text-main);
+  line-height: 1.4;
 }
-.md-body p { margin: 0.6em 0; }
-.md-body ul, .md-body ol { padding-left: 1.5em; }
+.md-body h1 { font-size: 1.42em; }
+.md-body h2 { font-size: 1.24em; }
+.md-body h3 { font-size: 1.1em; }
+.md-body h4 { font-size: 1em; }
+.md-body p { margin: 0.62em 0; }
+.md-body ul, .md-body ol { padding-left: 1.45em; margin: 0.62em 0; }
+.md-body li { margin: 0.24em 0; }
+.md-body li > p { margin: 0.24em 0; }
+.md-body a {
+  color: var(--brand);
+  text-decoration: none;
+  border-bottom: 1px solid var(--brand-border);
+}
+.md-body a:hover { border-bottom-color: var(--brand); }
+.md-body strong { font-weight: 600; color: var(--text-main); }
+.md-body hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.15em 0;
+}
 .md-body code {
   background: #f0f3f7;
   color: #c0341d;
   padding: 2px 5px;
   border-radius: 3px;
   font-family: 'JetBrains Mono', Consolas, monospace;
-  font-size: 0.9em;
+  /* 行内代码：相对字号，跟着外层正文一起放大 */
+  font-size: 0.95em;
 }
 .md-body pre {
   background: #282c34;
   color: #dcdfe4;
-  padding: 13px 15px;
+  padding: 14px 16px;
   border-radius: var(--radius-md);
   overflow-x: auto;
-  font-size: 13px;
-  line-height: 1.6;
+  /* 与外层正文同号：等宽拉丁字形视觉上比中文小，同字号才不会显得「代码字更小」 */
+  font-size: 1em;
+  line-height: 1.7;
 }
 .md-body pre code {
   background: transparent;
   color: inherit;
   padding: 0;
+  /*
+   * ⚠️ 关键修复：这里必须显式继承 pre 的字号。
+   * 之前没写，于是 `.md-body code` 的 0.9em 又作用了一次，
+   * 代码块里的字被「13px × 0.9」缩成约 11.7px —— 这就是「代码字特别小」的根因。
+   */
+  font-size: inherit;
 }
 .md-body blockquote {
   border-left: 3px solid var(--brand);
@@ -270,59 +303,183 @@ a:hover {
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   color: var(--text-regular);
 }
+.md-body blockquote > :first-child { margin-top: 0; }
+.md-body blockquote > :last-child { margin-bottom: 0; }
+/*
+ * 表格：display:block + overflow 让宽表格自己横向滚动，
+ * 否则内容会把气泡撑破（原来只有 width:100%）。
+ */
 .md-body table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
-  width: 100%;
-  margin: 0.8em 0;
+  margin: 0.85em 0;
+  /* 相对字号，跟着外层正文放大 */
+  font-size: 0.95em;
 }
 .md-body th, .md-body td {
   border: 1px solid var(--border);
-  padding: 8px 12px;
+  padding: 7px 12px;
+  white-space: nowrap;
 }
 .md-body th { background: var(--bg-soft); font-weight: 600; }
 .md-body img { max-width: 100%; border-radius: var(--radius-sm); }
 
-/* 代码块 + 复制按钮（v-html 注入的节点，样式必须放全局） */
-.md-code {
-  position: relative;
-  margin: 0.8em 0;
+/* ---------- 数学公式（KaTeX） ---------- */
+.md-body .katex { font-size: 1.06em; }
+/* 行内公式跟随正文，不换行断开公式本体 */
+.md-body .math-inline { white-space: nowrap; }
+.md-body .math-block {
+  margin: 0.85em 0;
+  padding: 2px 0;
+  /* 超宽公式自己滚动，不撑破气泡 */
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
 }
-.md-code pre {
-  margin: 0;
-}
-.md-code[data-lang]::before {
-  content: attr(data-lang);
-  position: absolute;
-  top: 6px;
-  left: 12px;
-  font-size: 11px;
-  color: #8b93a7;
+.md-body .math-block .katex-display { margin: 0; }
+/* 语法还没写完整时按原文显示，样式低调一点，别像报错 */
+.md-body .math-fallback {
   font-family: 'JetBrains Mono', Consolas, monospace;
-  pointer-events: none;
+  font-size: 0.92em;
+  color: var(--text-secondary);
+  background: var(--bg-soft);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+.md-body .math-block.math-fallback {
+  text-align: left;
+  padding: 8px 12px;
+  white-space: pre-wrap;
+}
+
+/*
+ * 流式光标：画在最后一块内容末尾（而不是另起一行），
+ * 让「正在吐字」这件事看起来是连续的。
+ * 必须放全局样式：v-html 注入的节点没有组件的 scoped 属性。
+ */
+.md-body.is-streaming > *:last-child::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: var(--brand);
+  border-radius: 1px;
+  animation: cc-caret 1.05s steps(1, end) infinite;
+}
+@keyframes cc-caret {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+
+/* 代码块：外层卡片 + 顶部信息条（语言 / 复制），样式必须放全局（v-html 内容吃不到 scoped 样式） */
+.md-code {
+  margin: 0.9em 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #282c34;
+}
+.md-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px 6px 14px;
+  background: rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.md-code-lang {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #97a1b5;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  letter-spacing: 0.02em;
   user-select: none;
 }
+/* 代码块内部的 pre 不再有自己的背景/圆角，统一由卡片承担 */
+.md-code pre {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+}
 .md-code-copy {
-  position: absolute;
-  top: 5px;
-  right: 8px;
-  z-index: 1;
-  padding: 2px 8px;
-  font-size: 11.5px;
-  line-height: 1.6;
+  flex-shrink: 0;
+  padding: 2px 9px;
+  font-size: 12.5px;
+  line-height: 1.7;
   color: #b9c0d0;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
-}
-.md-code:hover .md-code-copy {
-  opacity: 1;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 .md-code-copy:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+/* ---------- 聊天通用视觉零件 ---------- */
+/* 三点跳动：等待模型首个 token 时的「正在思考」 */
+.cc-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cc-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brand);
+  opacity: 0.35;
+  animation: cc-dot 1.15s ease-in-out infinite;
+}
+.cc-dots i:nth-child(2) { animation-delay: 0.16s; }
+.cc-dots i:nth-child(3) { animation-delay: 0.32s; }
+@keyframes cc-dot {
+  0%, 70%, 100% { opacity: 0.28; transform: translateY(0); }
+  35% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* 骨架屏：加载历史消息时的占位气泡 */
+.cc-skeleton {
+  padding: 6px 0;
+}
+.cc-skeleton-row {
+  display: flex;
+  gap: 10px;
+  margin: 18px 0;
+}
+.cc-skeleton-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.cc-skeleton-lines {
+  flex: 1;
+  min-width: 0;
+}
+.cc-sk-line {
+  height: 11px;
+  border-radius: 5px;
+  margin-bottom: 9px;
+}
+.cc-sk-line.is-short { width: 42%; }
+.cc-sk-line.is-mid { width: 68%; }
+.cc-sk-shimmer {
+  background: linear-gradient(90deg, #eef1f5 25%, #f7f9fc 37%, #eef1f5 63%);
+  background-size: 400% 100%;
+  animation: cc-shimmer 1.35s ease-in-out infinite;
+}
+@keyframes cc-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 
 /* ---------- 响应式 ---------- */

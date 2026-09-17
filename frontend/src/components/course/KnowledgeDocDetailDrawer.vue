@@ -93,13 +93,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import MarkdownIt from 'markdown-it'
-import hljs from 'highlight.js'
 import { View, Download, Edit } from '@element-plus/icons-vue'
 import { kbApi, resourceApi } from '@/api'
 import type { KnowledgeDocChunkItem, KnowledgeDocItem } from '@/api/types'
 import { statusText, statusTagType } from '@/composables/useKnowledgeDocs'
 import { formatDateTime, formatSize } from '@/utils/format'
+import { renderMarkdown } from '@/utils/markdown'
 import FileIcon from '@/components/FileIcon.vue'
 import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 
@@ -127,22 +126,7 @@ const editing = ref(false)
 const saving = ref(false)
 const chunkTogglingId = ref<number | null>(null)
 
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  highlight(code: string, lang: string): string {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return `<pre class="hljs"><code>${hljs.highlight(code, { language: lang }).value}</code></pre>`
-      } catch {
-        /* noop */
-      }
-    }
-    return `<pre class="hljs"><code>${md.utils.escapeHtml(code)}</code></pre>`
-  },
-})
-
-const renderedMarkdown = computed(() => md.render(markdownText.value))
+const renderedMarkdown = computed(() => renderMarkdown(markdownText.value, { breaks: false }))
 
 watch(visible, (v) => {
   if (!v) return

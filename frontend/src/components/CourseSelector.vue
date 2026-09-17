@@ -1,10 +1,11 @@
 <template>
-  <div class="course-selector">
-    <span class="cs-label">选择课程</span>
+  <div class="course-selector" :class="{ 'is-compact': compact }">
+    <span v-if="!compact" class="cs-label">选择课程</span>
     <el-select
       :model-value="modelValue"
-      placeholder="请选择课程"
-      style="width: 240px"
+      :placeholder="compact ? '选择课程知识库' : '请选择课程'"
+      :style="{ width: compact ? '100%' : '240px' }"
+      :size="compact ? 'small' : 'default'"
       filterable
       @update:model-value="onChange"
     >
@@ -27,7 +28,13 @@ import { useAuthStore } from '@/stores/auth'
 import { pickCoursesForRole, useCourseStore } from '@/stores/course'
 import type { CourseResponse } from '@/api/types'
 
-const props = defineProps<{ modelValue: number | null }>()
+/**
+ * compact：用于「输入区」里当作用域切换芯片（不显示标签、更小、撑满容器）。
+ * 非 compact：用于课程/知识库页面的常规选择器。
+ */
+const props = withDefaults(defineProps<{ modelValue: number | null; compact?: boolean }>(), {
+  compact: false,
+})
 const emit = defineEmits<{ 'update:modelValue': [v: number | null] }>()
 
 const auth = useAuthStore()
@@ -57,14 +64,40 @@ function onChange(v: number | null) {
   align-items: center;
   gap: 10px;
 }
+.course-selector.is-compact {
+  gap: 0;
+  width: 100%;
+}
 .cs-label {
   font-size: 13px;
   color: var(--text-secondary);
   white-space: nowrap;
 }
+.option-label {
+  margin-right: 12px;
+}
 .option-code {
   float: right;
   color: var(--text-faint);
   font-size: 12px;
+}
+
+/* 紧凑模式：做成一个圆角芯片，去掉表单控件的边框感 */
+.is-compact :deep(.el-select__wrapper) {
+  background: var(--bg-soft);
+  box-shadow: none;
+  border-radius: 999px;
+  padding: 3px 12px;
+  min-height: 30px;
+  font-size: 13px;
+  color: var(--text-regular);
+  transition: background 0.16s;
+}
+.is-compact :deep(.el-select__wrapper:hover) {
+  background: var(--brand-light);
+}
+.is-compact :deep(.el-select__wrapper.is-focused) {
+  background: var(--brand-light);
+  box-shadow: 0 0 0 1px var(--brand-border) inset;
 }
 </style>

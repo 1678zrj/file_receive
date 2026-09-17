@@ -138,10 +138,10 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import MarkdownIt from 'markdown-it'
 import { assignmentApi, resourceApi } from '@/api'
 import type { Assignment, SubmissionWithStudent } from '@/api/types'
 import { formatDateTime, deadlineInfo } from '@/utils/format'
+import { renderMarkdown } from '@/utils/markdown'
 import FileIcon from '@/components/FileIcon.vue'
 import UploadDialog from '@/components/UploadDialog.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
@@ -158,8 +158,9 @@ const visible = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
-const md = new MarkdownIt({ html: false, linkify: true })
-const renderedDesc = computed(() => (props.assignment ? md.render(props.assignment.description || '暂无描述') : ''))
+const renderedDesc = computed(() =>
+  props.assignment ? renderMarkdown(props.assignment.description || '暂无描述', { breaks: false }) : '',
+)
 const isOverdue = computed(() => (props.assignment ? deadlineInfo(props.assignment.deadline).overdue : false))
 
 // ---- 学生提交 ----

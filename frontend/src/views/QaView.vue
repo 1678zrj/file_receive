@@ -66,53 +66,12 @@
 
     <!-- ============ 右侧：对话主体 ============ -->
     <div class="qa-main">
-      <!-- 顶栏 -->
-      <div class="qa-topbar">
-        <div class="qa-left">
-          <CourseSelector v-model="selectedCourseId" />
-          <span v-if="runState !== 'idle'" class="run-state" :class="`is-${runState}`">
-            <el-icon :class="{ 'animate-pulse': runState !== 'stopped' }" :size="13">
-              <Loading v-if="runState !== 'stopped'" />
-              <VideoPause v-else />
-            </el-icon>
-            {{ runStateText }}
-          </span>
-          <el-tag v-else-if="messagesLoading" type="info" effect="plain" size="small" class="streaming-tag">
-            <el-icon class="animate-pulse" :size="12"><Loading /></el-icon> 加载历史…
-          </el-tag>
-        </div>
-        <div class="qa-right">
-          <el-button v-if="isStreaming" text :icon="VideoPause" @click="onStop">停止接收</el-button>
-          <el-button
-            v-else-if="runState === 'stalled'"
-            text
-            :icon="RefreshRight"
-            @click="onContinue"
-          >
-            重新连接
-          </el-button>
-          <el-button v-else-if="canContinue" text :icon="RefreshRight" @click="onContinue">
-            继续接收
-          </el-button>
-          <el-button
-            v-if="activeSession?.threadId"
-            text
-            :icon="Refresh"
-            :loading="messagesLoading"
-            @click="onRefresh"
-          >
-            刷新历史
-          </el-button>
-          <el-button
-            v-if="messages.length > 0"
-            text
-            :icon="Download"
-            @click="onExport"
-          >
-            导出
-          </el-button>
-        </div>
-      </div>
+      <!--
+        这里刻意**没有顶栏**：聊天区直接顶到最上面，把纵向空间全留给消息。
+        原来顶栏里的东西都并进了输入区上方那一行（见下方 scope-row）：
+        课程选择、运行状态 = 左侧；停止/继续接收、会话操作「⋯」= 右侧。
+        这些控件只在需要时出现，空闲时那一行几乎只有一个课程芯片。
+      -->
 
       <el-alert
         v-if="syncError"
@@ -134,8 +93,22 @@
       -->
       <div class="qa-body">
         <div ref="msgBox" class="chat-messages" @scroll="onScroll">
+          <!-- 居中窄栏：消息、欢迎页、骨架屏都收在这一列里，像 DeepSeek / Gemini 那样 -->
+          <div class="chat-column">
+            <!-- 加载历史骨架屏（比一个「加载中」标签更能说明正在发生什么） -->
+            <div v-if="messagesLoading && messages.length === 0" class="cc-skeleton">
+            <div v-for="i in 3" :key="i" class="cc-skeleton-row">
+              <div class="cc-skeleton-avatar cc-sk-shimmer"></div>
+              <div class="cc-skeleton-lines">
+                <div class="cc-sk-line cc-sk-shimmer" :class="i % 2 ? 'is-mid' : ''"></div>
+                <div class="cc-sk-line cc-sk-shimmer"></div>
+                <div class="cc-sk-line is-short cc-sk-shimmer"></div>
+              </div>
+            </div>
+          </div>
+
           <!-- 空会话 + 没选课程：提示先选课程 -->
-          <div v-if="messages.length === 0 && selectedCourseId == null" class="chat-welcome">
+          <div v-else-if="messages.length === 0 && selectedCourseId == null" class="chat-welcome">
             <div class="cw-logo"><el-icon :size="40" color="#2d6cdf"><MagicStick /></el-icon></div>
             <h3>课程 Agent 智能助手</h3>
             <p>请先在右上角选择一门课程知识库，然后就可以开始提问了</p>
@@ -151,18 +124,31 @@
             </div>
           </div>
 
-          <!-- 消息列表 -->
+          <!-- 消息列表：不带头像，靠「左文右泡」区分角色（DeepSeek / Gemini 的做法） -->
           <template v-for="m in messages" :key="m.id">
             <div v-if="m.role === 'user'" class="msg-row is-user">
               <div class="user-side">
                 <span v-if="m.scopeLabel" class="scope-tag">📚 {{ m.scopeLabel }}</span>
                 <div class="msg-bubble user-bubble">{{ m.content }}</div>
+                <!--
+                  操作行放在用户消息**下方**（和助手消息的操作位置一致）。
+                  用固定高度 + opacity 而不是 v-if/display：
+                  悬停出现时不会把下面的消息顶下去（布局不跳动）。
+                  将来要加「编辑消息」「重新生成」直接往这一行里塞即可。
+                -->
+                <div class="user-actions">
+                  <span
+                    class="msg-action"
+                    title="复制这条提问"
+                    @click="onCopyText(m.content, '提问')"
+                  >
+                    <el-icon :size="12"><DocumentCopy /></el-icon> 复制
+                  </span>
+                </div>
               </div>
-              <UserAvatar :name="auth.user?.real_name" :size="34" />
             </div>
 
             <div v-else class="msg-row is-ai">
-              <div class="ai-avatar"><el-icon :size="18" color="#2d6cdf"><MagicStick /></el-icon></div>
               <div class="ai-content">
                 <!--
                   所有块都按 parts 的顺序渲染。
@@ -196,7 +182,10 @@
                 </template>
 
                 <div v-if="m.streaming && m.parts.length === 0" class="waiting-box">
-                  <span class="waiting-text typing-cursor">正在思考</span>
+                  <span class="cc-dots"><i></i><i></i><i></i></span>
+                  <span class="waiting-text">
+                    {{ runState === 'queued' ? '排队等待执行' : '正在检索与思考' }}
+                  </span>
                 </div>
 
                 <!-- 发送失败 → 复用同一幂等键重试 -->
@@ -222,42 +211,137 @@
           </template>
 
           <transition name="fade">
-            <el-button v-if="!atBottom" class="to-bottom" circle :icon="Bottom" @click="scrollToBottom(true)" />
+            <el-button
+              v-if="!atBottom"
+              class="to-bottom"
+              :class="{ 'has-new': isStreaming }"
+              round
+              :icon="Bottom"
+              @click="scrollToBottom(true, true)"
+            >
+              {{ isStreaming ? '新内容' : '回到底部' }}
+            </el-button>
           </transition>
+          </div>
         </div>
 
-        <!-- 未选课程时：提问被拦住，但历史照常可看 -->
-        <div v-if="selectedCourseId == null" class="need-course">
-          <el-icon :size="14"><InfoFilled /></el-icon>
-          请先在右上角选择课程知识库，之后才能继续提问（选择只影响下一次提问，不会影响已有记录）
-        </div>
-
-        <!-- 输入区 -->
+        <!-- 输入区：与消息同一列宽，做成一个圆角输入卡（DeepSeek / Gemini 那种 composer） -->
         <div class="chat-input-area">
-          <el-input
-            v-model="input"
-            type="textarea"
-            :rows="1"
-            :autosize="{ minRows: 1, maxRows: 5 }"
-            resize="none"
-            :placeholder="
-              selectedCourseId == null
-                ? '请先选择课程知识库后再提问...'
-                : '输入问题，Enter 发送，Shift + Enter 换行...'
-            "
-            :disabled="isStreaming || selectedCourseId == null"
-            @keydown.enter.exact.prevent="send"
-          />
-          <el-button
-            type="primary"
-            class="send-btn btn-primary"
-            :icon="Promotion"
-            circle
-            size="large"
-            :disabled="!input.trim() || isStreaming || selectedCourseId == null"
-            @click="send"
-            title="发送"
-          />
+          <div class="chat-column">
+            <!--
+              这一行承担了原来顶栏的全部职责，但不额外占一行高度：
+                左：知识库作用域（scope 属于每一次提问）+ 运行状态
+                右：运行控制（停止/继续）+ 会话操作「⋯」
+              空闲时左只剩一个课程芯片、右只剩一个「⋯」，几乎不占视线。
+            -->
+            <div class="scope-row">
+              <div class="scope-picker">
+                <CourseSelector v-model="selectedCourseId" compact />
+              </div>
+
+              <span v-if="runState !== 'idle'" class="run-state" :class="`is-${runState}`">
+                <el-icon :class="{ 'animate-pulse': runState !== 'stopped' }" :size="13">
+                  <Loading v-if="runState !== 'stopped'" />
+                  <VideoPause v-else />
+                </el-icon>
+                {{ runStateText }}
+              </span>
+              <el-tag
+                v-else-if="messagesLoading"
+                type="info"
+                effect="plain"
+                size="small"
+                class="streaming-tag"
+              >
+                <el-icon class="animate-pulse" :size="12"><Loading /></el-icon> 加载历史…
+              </el-tag>
+              <span v-else class="scope-note">
+                <template v-if="selectedCourseId == null">请先选择课程知识库，之后才能提问</template>
+                <template v-else>只影响这一次提问，历史记录不受影响</template>
+              </span>
+
+              <span class="scope-row-actions">
+                <el-button v-if="isStreaming" text size="small" :icon="VideoPause" @click="onStop">
+                  停止接收
+                </el-button>
+                <el-button
+                  v-else-if="runState === 'stalled'"
+                  text
+                  size="small"
+                  :icon="RefreshRight"
+                  @click="onContinue"
+                >
+                  重新连接
+                </el-button>
+                <el-button
+                  v-else-if="canContinue"
+                  text
+                  size="small"
+                  :icon="RefreshRight"
+                  @click="onContinue"
+                >
+                  继续接收
+                </el-button>
+
+                <el-dropdown trigger="click" placement="top-end" @command="onSessionCommand">
+                  <el-button text size="small" :icon="MoreFilled" title="会话操作" />
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item
+                        command="refresh"
+                        :icon="Refresh"
+                        :disabled="!activeSession?.threadId"
+                      >
+                        刷新历史
+                      </el-dropdown-item>
+                      <el-dropdown-item
+                        command="export"
+                        :icon="Download"
+                        :disabled="messages.length === 0"
+                      >
+                        导出为 Markdown
+                      </el-dropdown-item>
+                      <el-dropdown-item
+                        command="delete"
+                        :icon="Delete"
+                        divided
+                        :disabled="!activeSession"
+                      >
+                        删除本会话
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </span>
+            </div>
+
+            <div class="composer-box">
+              <el-input
+                v-model="input"
+                type="textarea"
+                :rows="1"
+                :autosize="{ minRows: 1, maxRows: 6 }"
+                resize="none"
+                :placeholder="
+                  selectedCourseId == null
+                    ? '请先选择课程知识库后再提问...'
+                    : '输入问题，Enter 发送，Shift + Enter 换行...'
+                "
+                :disabled="isStreaming || selectedCourseId == null"
+                @keydown.enter.exact.prevent="send"
+              />
+              <el-button
+                type="primary"
+                class="send-btn btn-primary"
+                :icon="Promotion"
+                circle
+                size="large"
+                :disabled="!input.trim() || isStreaming || selectedCourseId == null"
+                @click="send"
+                title="发送"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -276,13 +360,13 @@ import {
   Plus,
   Loading,
   Refresh,
-  InfoFilled,
   VideoPause,
   RefreshRight,
   Search,
   Download,
   DocumentCopy,
   CircleCheckFilled,
+  MoreFilled,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -293,7 +377,6 @@ import { copyText } from '@/utils/clipboard'
 import { downloadText, safeFileName, sessionToMarkdown } from '@/utils/chatExport'
 import type { AgentChatMessage, ChatSession, InterruptAnswerInput } from '@/api/types'
 import CourseSelector from '@/components/CourseSelector.vue'
-import UserAvatar from '@/components/UserAvatar.vue'
 import InterruptForm from '@/components/agent/InterruptForm.vue'
 import MessagePartItem from '@/components/agent/MessagePartItem.vue'
 
@@ -321,7 +404,7 @@ const courseName = computed(() => {
   return c?.name || '当前课程'
 })
 
-/** 当前角色下可选的课程（与右上角 CourseSelector 用同一份逻辑，保证「默认选中」的一定在列表里） */
+/** 当前角色下可选的课程（与输入区的 CourseSelector 用同一份逻辑，保证「默认选中」的一定在列表里） */
 const availableCourses = computed(() =>
   pickCoursesForRole(auth.user?.role, {
     teaching: courseStore.teaching,
@@ -558,11 +641,14 @@ function onScroll() {
   atBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 60
 }
 
-async function scrollToBottom(force = false) {
+async function scrollToBottom(force = false, smooth = false) {
   await nextTick()
   const el = msgBox.value
+  if (!el) return
   if (force || atBottom.value) {
-    if (el) el.scrollTop = el.scrollHeight
+    // 流式自动滚动必须瞬时（smooth 会让视口一直追不上），用户主动点击才平滑
+    if (smooth) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    else el.scrollTop = el.scrollHeight
   }
 }
 
@@ -625,6 +711,13 @@ async function onRetry(msgId: string) {
   }
 }
 
+/** 复制任意文本（用户提问 / 助手回答都走这里） */
+async function onCopyText(text: string, label = '内容') {
+  const ok = await copyText(text)
+  if (ok) ElMessage.success(`已复制${label}`)
+  else ElMessage.error('复制失败，请手动选择文本')
+}
+
 async function onCopyAnswer(m: AgentChatMessage) {
   const text =
     m.parts
@@ -632,9 +725,7 @@ async function onCopyAnswer(m: AgentChatMessage) {
       .map((p) => p.content || '')
       .join('\n\n')
       .trim() || m.content
-  const ok = await copyText(text)
-  if (ok) ElMessage.success('已复制回答')
-  else ElMessage.error('复制失败，请手动选择文本')
+  await onCopyText(text, '回答')
 }
 
 function onExport() {
@@ -677,20 +768,44 @@ async function onContinue() {
   const ok = await continueCurrent()
   if (!ok) ElMessage.warning('当前没有可继续接收的对话')
 }
+
+/** 顶栏「⋯」菜单：会话级操作都收在这里，避免顶栏被按钮占满 */
+type SessionCommand = 'refresh' | 'export' | 'delete'
+async function onSessionCommand(command: SessionCommand) {
+  if (command === 'refresh') {
+    await onRefresh()
+  } else if (command === 'export') {
+    onExport()
+  } else if (command === 'delete') {
+    const id = activeId.value
+    if (id) await onRemoveSession(id)
+  }
+}
 </script>
 
 <style scoped>
+/*
+ * 布局要点（参考 DeepSeek / Gemini 的网页端）：
+ *  - 消息不再是「占满可用宽度再给正文限窄」，而是整列**居中限宽**（--chat-col），
+ *    顶栏、消息、输入卡都对齐到同一条栏宽 —— 这样容器宽度 = 阅读宽度，两侧留白是对称的，
+ *    不会出现「容器很宽、文字很窄、两边大片死区」的逼仄感。
+ *  - 聊天区用纯白，侧栏用浅灰：让视线集中在 Agent 的输出上。
+ *  - 用户消息改成淡蓝底 + 深色字（原来是与正文抢注意力的高饱和蓝底白字）。
+ */
 .qa-page {
+  --chat-col: 840px;
+  --chat-gutter: 28px;
   height: calc(100vh - 52px);
   display: flex;
   overflow: hidden;
+  background: var(--bg-card);
 }
 
 /* ============ 左侧会话列表 ============ */
 .qa-sidebar {
-  width: 230px;
+  width: 248px;
   flex-shrink: 0;
-  background: #fff;
+  background: var(--bg-soft);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -705,7 +820,7 @@ async function onContinue() {
 }
 .session-group {
   padding: 8px 10px 4px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-faint);
   letter-spacing: 0.02em;
@@ -723,7 +838,7 @@ async function onContinue() {
   align-items: center;
   gap: 6px;
   padding: 14px 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 .session-empty {
@@ -753,7 +868,7 @@ async function onContinue() {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-main);
   overflow: hidden;
@@ -768,7 +883,7 @@ async function onContinue() {
   color: var(--brand);
 }
 .session-meta {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-faint);
   margin-top: 2px;
   overflow: hidden;
@@ -793,7 +908,7 @@ async function onContinue() {
   gap: 5px;
   padding: 10px 14px;
   border-top: 1px solid var(--border);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--brand);
   flex-shrink: 0;
 }
@@ -804,25 +919,8 @@ async function onContinue() {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px 24px 0;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
-}
-.qa-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.qa-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  /* 没有顶栏，聊天区直接顶到最上面，纵向空间全给消息 */
+  background: var(--bg-card);
 }
 .streaming-tag {
   display: inline-flex;
@@ -834,7 +932,7 @@ async function onContinue() {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12.5px;
+  font-size: 13px;
   padding: 2px 9px;
   border-radius: 11px;
   border: 1px solid var(--brand-border);
@@ -863,19 +961,15 @@ async function onContinue() {
   background: var(--bg-soft);
   color: var(--text-secondary);
 }
-.qa-right {
-  display: flex;
-}
 .sync-alert {
-  margin-top: 10px;
+  /* 提示条也收进居中栏，避免通栏横幅打断阅读栏 */
+  width: calc(100% - var(--chat-gutter) * 2);
+  max-width: var(--chat-col);
+  margin: 12px auto 0;
   flex-shrink: 0;
 }
 .sync-alert-tip {
-  font-size: 12.5px;
-}
-.qa-empty {
-  margin-top: 20px;
-  padding: 40px 0;
+  font-size: 13px;
 }
 
 .qa-body {
@@ -883,118 +977,168 @@ async function onContinue() {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin-top: 6px;
+}
+
+/* 居中栏：消息 / 欢迎页 / 输入卡共用同一条宽度 */
+.chat-column {
+  width: 100%;
+  max-width: var(--chat-col);
+  margin: 0 auto;
 }
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 6px;
+  /* 顶部只留一点点：聊天区紧贴布局顶栏下方，纵向空间尽量给消息 */
+  padding: 14px var(--chat-gutter) 10px;
   position: relative;
+  /*
+   * 这里刻意**不加** scroll-behavior: smooth：
+   * 流式输出时每个 token 都要把视口钉在底部，平滑滚动会让画面一直「追不上」而发飘。
+   * 只有用户主动点「回到底部」时才用平滑滚动（见 scrollToBottom 的 smooth 参数）。
+   */
 }
 .chat-welcome {
   text-align: center;
-  padding: 36px 20px;
+  padding: 26px 16px 32px;
 }
 .cw-logo {
   display: flex;
   justify-content: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .chat-welcome h3 {
-  margin: 0 0 8px;
-  font-size: 20px;
+  margin: 0 0 10px;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--text-main);
 }
 .chat-welcome p {
   color: var(--text-secondary);
-  margin: 0 0 24px;
+  margin: 0 0 32px;
+  font-size: 14px;
 }
 .suggest-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 10px;
-  max-width: 680px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  max-width: 640px;
   margin: 0 auto;
 }
 .suggest-chip {
   background: var(--bg-soft);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 13px 15px;
-  font-size: 13px;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13.5px;
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
+  color: var(--text-regular);
 }
 .suggest-chip:hover {
   border-color: var(--brand);
   background: var(--brand-light);
+  color: var(--brand);
   transform: translateY(-2px);
 }
 
-/* 消息 */
+/* 消息行：单列内容，靠对齐方式区分角色（不带头像） */
 .msg-row {
   display: flex;
-  gap: 10px;
-  margin: 16px 0;
+  margin-bottom: 28px;
   align-items: flex-start;
 }
+/* 新一轮提问前多留一点空，让「问答」成为视觉分组 */
 .msg-row.is-user {
   justify-content: flex-end;
+  margin-top: 34px;
+}
+/* 第一条消息（通常是提问）不需要上方留白，否则聊天区顶部会空一大块 */
+.chat-column > .msg-row:first-child {
+  margin-top: 0;
 }
 .user-side {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 5px;
+  max-width: 78%;
+}
+/*
+ * 用户消息下方的操作行。
+ * 固定高度 + opacity（而非 v-if / display:none）：悬停出现时不会引起布局跳动；
+ * 将来加「编辑消息」等多个操作用同一行即可。
+ *
+ * 显隐**只在这一层控制**：行内的按钮不再自己设 opacity。
+ * ⚠️ 踩坑记录：CSS 的 opacity 是相乘的。如果容器是 0→1、里面按钮又自带 opacity: 0，
+ * 结果永远是 1 × 0 = 0，按钮看起来「悬停也不出现」。所以这里明确分工：
+ *   - 助手消息：.msg-time .msg-action 自己隐藏，靠 .msg-row.is-ai:hover 揭示
+ *   - 用户消息：整个 .user-actions 一起隐藏/显示
+ */
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 18px;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 .scope-tag {
-  font-size: 11px;
-  color: var(--brand);
-  background: var(--brand-light);
-  border: 1px solid var(--brand-border);
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
   padding: 1px 8px;
   border-radius: 3px;
   flex-shrink: 0;
 }
 .msg-bubble {
-  padding: 11px 15px;
-  border-radius: 8px;
-  font-size: 14px;
-  line-height: 1.7;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 15.5px;
+  line-height: 1.75;
   word-break: break-word;
 }
+/* 用户消息：淡蓝底 + 深色字，不再用高饱和蓝底白字抢 Agent 输出的注意力 */
 .user-bubble {
-  background: var(--brand);
-  color: #fff;
-  border-bottom-right-radius: 4px;
-  white-space: pre-wrap;
-  max-width: 72%;
-}
-.ai-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
   background: var(--brand-light);
+  color: var(--text-main);
   border: 1px solid var(--brand-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  border-bottom-right-radius: 5px;
+  white-space: pre-wrap;
+  /* 在 flex 行里要能收缩换行 */
+  min-width: 0;
 }
 .ai-content {
-  max-width: 78%;
+  /* 没有头像占位了，正文直接吃满整条居中栏（栏宽本身就是阅读宽度） */
+  max-width: 100%;
   min-width: 0;
   flex: 1;
 }
+/* 栏宽从约 520px 放到 840px 后，正文与代码都放大一档，行宽/字号更平衡 */
+.ai-content :deep(.md-body) {
+  font-size: 15.5px;
+  line-height: 1.82;
+}
+/* 代码块再单独抬一点：等宽字体的视觉尺寸比中文小，同字号下会显得更小 */
+.ai-content :deep(.md-code-lang) {
+  font-size: 12.5px;
+}
+.ai-content :deep(.md-code-copy) {
+  font-size: 13px;
+}
 .waiting-box {
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .waiting-text {
   color: var(--text-faint);
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .msg-time {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
   margin-top: 5px;
   padding-left: 2px;
@@ -1002,20 +1146,37 @@ async function onContinue() {
   align-items: center;
   gap: 6px;
 }
+/* 操作按钮的通用外观（不负责显隐，显隐交给所在的容器） */
 .msg-action {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   cursor: pointer;
   color: var(--text-faint);
-  opacity: 0;
   transition: opacity 0.15s, color 0.15s;
 }
-.msg-row.is-ai:hover .msg-action {
+/* 助手消息：按钮藏在时间行里，单独隐藏（用户消息由 .user-actions 整行控制，见上） */
+.msg-time .msg-action {
+  opacity: 0;
+}
+.msg-row.is-ai:hover .msg-action,
+.msg-row.is-user:hover .user-actions,
+.msg-row.is-ai:focus-within .msg-action,
+.msg-row.is-user:focus-within .user-actions {
   opacity: 1;
 }
 .msg-action:hover {
   color: var(--brand);
+}
+/*
+ * 触屏设备没有 hover：复制按钮不能靠悬停才出现，
+ * 否则手机上永远点不到。
+ */
+@media (hover: none) {
+  .msg-time .msg-action,
+  .user-actions {
+    opacity: 1;
+  }
 }
 
 /* 中断回答回显 */
@@ -1030,7 +1191,7 @@ async function onContinue() {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: #1fa06d;
   margin-bottom: 6px;
@@ -1038,7 +1199,7 @@ async function onContinue() {
 .ae-row {
   display: flex;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.7;
   padding: 2px 0;
 }
@@ -1066,37 +1227,91 @@ async function onContinue() {
   display: flex;
   box-shadow: var(--shadow-md);
 }
+/* 流式输出且用户往上翻时，用「新内容」提示把注意力叫回来 */
+.to-bottom.has-new {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: #fff;
+}
 
-/* 未选课程提示条 */
-.need-course {
+/* 输入框上方那一行：作用域 + 状态 + 运行控制 + 会话操作 */
+.scope-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  margin-bottom: 2px;
-  background: #fffbe6;
-  border: 1px solid #ffe58f;
-  border-radius: var(--radius-sm);
+  gap: 10px;
+  padding: 0 2px 9px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.scope-picker {
+  /* 芯片式选择器：不抢视线，但随时可点着换知识库 */
+  width: 232px;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+.scope-note {
   font-size: 12.5px;
-  color: #8c6d1f;
+  color: var(--text-faint);
+  min-width: 0;
+}
+/* 右侧操作组推到最右 */
+.scope-row-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   flex-shrink: 0;
 }
 
-/* 输入区 */
+/* 输入区：一个圆角输入卡，浮在底部（DeepSeek / Gemini 的 composer 形态） */
 .chat-input-area {
+  position: relative;
+  flex-shrink: 0;
+  padding: 10px var(--chat-gutter) 22px;
+  background: var(--bg-card);
+}
+/* 内容往输入卡下面滚时用一层白色渐隐过渡，避免文字「硬切」在卡片边上 */
+.chat-input-area::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 26px;
+  transform: translateY(-100%);
+  background: linear-gradient(to top, var(--bg-card), transparent);
+  pointer-events: none;
+}
+.composer-box {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  padding: 14px 4px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-page);
-  flex-shrink: 0;
+  padding: 9px 10px 9px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-dark);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(31, 39, 51, 0.05);
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
+.composer-box:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 3px 16px rgba(45, 108, 223, 0.13);
+}
+/* 去掉 textarea 自己的边框/阴影，让整张卡看起来是一个输入框 */
 .chat-input-area :deep(.el-textarea__inner) {
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 14px;
-  line-height: 1.6;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 7px 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-main);
+}
+.chat-input-area :deep(.el-textarea__inner):focus {
+  box-shadow: none;
+}
+.chat-input-area :deep(.el-textarea.is-disabled .el-textarea__inner) {
+  background: transparent;
 }
 .send-btn {
   flex-shrink: 0;
@@ -1108,12 +1323,24 @@ async function onContinue() {
   opacity: 0;
 }
 
-@media (max-width: 900px) {
-  .qa-sidebar {
-    width: 170px;
+@media (max-width: 1100px) {
+  .qa-page {
+    --chat-col: 100%;
+    --chat-gutter: 18px;
   }
-  .qa-main {
-    padding: 12px 12px 0;
+}
+@media (max-width: 900px) {
+  .qa-page {
+    --chat-gutter: 12px;
+  }
+  .qa-sidebar {
+    width: 176px;
+  }
+  .msg-row.is-user {
+    margin-top: 26px;
+  }
+  .user-side {
+    max-width: 88%;
   }
 }
 </style>

@@ -15,6 +15,7 @@
   <div
     v-if="part.type === 'text'"
     class="part part-text md-body"
+    :class="{ 'is-streaming': streaming }"
     v-html="renderedText"
     @click="onContentClick"
   ></div>
@@ -163,7 +164,9 @@ async function onContentClick(e: MouseEvent) {
   const target = e.target as HTMLElement | null
   const btn = target?.closest?.('.md-code-copy') as HTMLElement | null
   if (!btn) return
-  const code = btn.parentElement?.querySelector('code')?.textContent ?? ''
+  // 按钮在顶部信息条里，<code> 是它的「兄弟节点的子节点」，
+  // 所以要从整个 .md-code 卡片里找，不能用 btn.parentElement
+  const code = btn.closest('.md-code')?.querySelector('code')?.textContent ?? ''
   if (!code) return
   const ok = await copyText(code)
   const original = btn.dataset.label || '复制'
@@ -186,7 +189,7 @@ async function onContentClick(e: MouseEvent) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--text-secondary);
   user-select: none;
   cursor: pointer;
@@ -205,10 +208,10 @@ async function onContentClick(e: MouseEvent) {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .part-status {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-faint);
 }
 .part-arrow {
@@ -232,20 +235,22 @@ async function onContentClick(e: MouseEvent) {
 }
 .part-thought-body {
   padding: 0 13px 11px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--text-regular);
-  line-height: 1.75;
+  line-height: 1.78;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 320px;
   overflow-y: auto;
 }
 
-/* 正文块（无边框纯文本，视觉上最突出） */
+/*
+ * 正文块（无边框纯文本，视觉上最突出）。
+ * 字号/行高交给 .md-body（全局 Markdown 样式）统一决定 ——
+ * 这里再写一次会和 QaView 里对 .md-body 的覆盖产生同权重冲突，谁生效取决于样式注入顺序。
+ */
 .part-text {
-  font-size: 14.5px;
   color: var(--text-main);
-  line-height: 1.75;
 }
 
 /* 工具调用块 */
@@ -262,12 +267,12 @@ async function onContentClick(e: MouseEvent) {
   color: var(--brand);
 }
 .part-tool-result {
-  padding: 9px 13px;
+  padding: 10px 13px;
   border-top: 1px solid var(--border);
   background: var(--bg-soft);
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.65;
+  font-size: 13px;
+  line-height: 1.7;
   max-height: 260px;
   overflow-y: auto;
   white-space: pre-wrap;

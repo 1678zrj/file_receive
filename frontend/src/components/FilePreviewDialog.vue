@@ -56,11 +56,10 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
-import 'highlight.js/styles/atom-one-dark.css'
 import { resourceApi } from '@/api'
 import { fileCategory } from '@/utils/format'
+import { escapeHtml, renderMarkdown } from '@/utils/markdown'
 
 const props = defineProps<{
   modelValue: boolean
@@ -74,21 +73,6 @@ const visible = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
-const md: MarkdownIt = new MarkdownIt({
-  html: false,
-  linkify: true,
-  highlight(code: string, lang: string): string {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return `<pre class="hljs"><code>${hljs.highlight(code, { language: lang }).value}</code></pre>`
-      } catch {
-        /* noop */
-      }
-    }
-    return `<pre class="hljs"><code>${md.utils.escapeHtml(code)}</code></pre>`
-  },
-})
-
 const loading = ref(false)
 const error = ref('')
 const errorTitle = ref('加载失败')
@@ -98,7 +82,7 @@ const textContent = ref('')
 const kind = computed(() => fileCategory(props.fileName || ''))
 const codeLang = computed(() => (props.fileName.split('.').pop() || '').toLowerCase())
 
-const renderedMarkdown = computed(() => md.render(textContent.value))
+const renderedMarkdown = computed(() => renderMarkdown(textContent.value, { breaks: false }))
 const highlightedCode = computed(() => {
   if (hljs.getLanguage(codeLang.value)) {
     try {
@@ -107,7 +91,7 @@ const highlightedCode = computed(() => {
       /* noop */
     }
   }
-  return md.utils.escapeHtml(textContent.value)
+  return escapeHtml(textContent.value)
 })
 
 watch(visible, (v) => {
