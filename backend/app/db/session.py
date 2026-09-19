@@ -17,8 +17,8 @@ from app.core.config import settings
 engine: AsyncEngine = create_async_engine(
     settings.database_url,
     echo=False,
-    pool_size=20,
-    max_overflow=30,
+    pool_size=10,
+    max_overflow=10,
     pool_pre_ping=True,
     pool_recycle=1800,
     # 针对MySQL的额外优化参数

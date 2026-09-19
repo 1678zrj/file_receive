@@ -251,7 +251,7 @@ async function onSubmit() {
 .form-card {
   width: 100%;
   max-width: 400px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow-md);
@@ -334,9 +334,9 @@ async function onSubmit() {
   padding: 1px 7px;
   border-radius: 3px;
 }
-.dc-role.t { background: #fdf3e3; color: #b7760a; }
-.dc-role.s { background: #e7f6ef; color: #1a7a50; }
-.dc-role.a { background: #fdecec; color: #b73d41; }
+.dc-role.t { background: var(--warn-bg); color: var(--warn-text); }
+.dc-role.s { background: var(--success-bg); color: var(--success-text); }
+.dc-role.a { background: var(--red-light); color: var(--red); }
 .dc-name {
   font-size: 12.5px;
   color: var(--text-main);

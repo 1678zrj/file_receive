@@ -132,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import * as echarts from 'echarts/core'
 import { PieChart, BarChart } from 'echarts/charts'
@@ -140,6 +140,7 @@ import { TooltipComponent, LegendComponent, GridComponent } from 'echarts/compon
 import { CanvasRenderer } from 'echarts/renderers'
 import { useAuthStore } from '@/stores/auth'
 import { useCourseStore } from '@/stores/course'
+import { useThemeStore } from '@/stores/theme'
 import { statsApi, assignmentApi } from '@/api'
 import type { Assignment, StatsOverview } from '@/api/types'
 import { courseCover, deadlineInfo, formatDateTime } from '@/utils/format'
@@ -149,6 +150,7 @@ echarts.use([PieChart, BarChart, TooltipComponent, LegendComponent, GridComponen
 
 const auth = useAuthStore()
 const courseStore = useCourseStore()
+const theme = useThemeStore()
 
 const rateChartRef = ref<HTMLDivElement>()
 const distChartRef = ref<HTMLDivElement>()
@@ -163,6 +165,18 @@ onMounted(async () => {
   loadStats()
   loadUpcoming()
 })
+
+/*
+ * 切换主题时重新渲染图表：echarts 的选项里是取好的颜色快照，
+ * 不重新 setOption 的话，切到深色后坐标轴/网格线还是浅色主题的值。
+ */
+watch(
+  () => theme.mode,
+  () => {
+    // 等一帧，确保 html.dark 已经生效、CSS 变量已是新值
+    nextTickRender()
+  },
+)
 
 onBeforeUnmount(() => {
   rateChart?.dispose()
@@ -191,41 +205,41 @@ const statCards = computed(() => [
     icon: 'Notebook',
     label: auth.isAdmin ? '全部课程' : auth.isTeacher ? '我教的课程' : '在学课程',
     value: stats.value?.course_count ?? courseStore.allCourses.length,
-    bg: '#e8f1fd',
-    color: '#2d6cdf',
+    bg: 'var(--brand-light)',
+    color: 'var(--brand)',
   },
   {
     icon: 'User',
     label: isTeachingSide.value ? '学生总数' : '全部课程',
     value: stats.value?.student_count ?? courseStore.allCourses.length,
-    bg: '#e7f6ef',
-    color: '#1a7a50',
+    bg: 'var(--success-bg)',
+    color: 'var(--success-text)',
   },
   {
     icon: 'EditPen',
     label: '作业数',
     value: stats.value?.assignment_count ?? '—',
-    bg: '#fdf3e3',
-    color: '#b7760a',
+    bg: 'var(--warn-bg)',
+    color: 'var(--warn-text)',
   },
   {
     icon: 'DataAnalysis',
     label: '作业提交率',
     value: stats.value ? `${stats.value.submission_rate}%` : '—',
-    bg: '#f0edfb',
-    color: '#7a5cc4',
+    bg: 'var(--purple-light)',
+    color: 'var(--purple)',
   },
 ])
 
 const quickEntries = computed(() => {
   const list = [
-    { icon: 'Search', title: '课程广场', to: '/courses', color: '#2d6cdf' },
-    { icon: 'Notebook', title: '我的课程', to: '/my-courses', color: '#1a7a50' },
-    { icon: 'Collection', title: '知识库管理', to: '/knowledge', color: '#b7760a' },
-    { icon: 'ChatDotRound', title: 'AI 问答', to: '/qa', color: '#7a5cc4' },
+    { icon: 'Search', title: '课程广场', to: '/courses', color: 'var(--brand)' },
+    { icon: 'Notebook', title: '我的课程', to: '/my-courses', color: 'var(--success-text)' },
+    { icon: 'Collection', title: '知识库管理', to: '/knowledge', color: 'var(--warn-text)' },
+    { icon: 'ChatDotRound', title: 'AI 问答', to: '/qa', color: 'var(--purple)' },
   ]
   if (auth.isTeacherOrAdmin) {
-    list.push({ icon: 'Plus', title: '创建课程', to: '/my-courses?create=1', color: '#31859b' })
+    list.push({ icon: 'Plus', title: '创建课程', to: '/my-courses?create=1', color: 'var(--teal)' })
   }
   return list
 })
@@ -255,8 +269,32 @@ async function nextTickRender() {
   renderCharts()
 }
 
+/**
+ * 从 CSS 变量里读当前主题的颜色。
+ *
+ * echarts 的配色是写在 option 里的 JS 值，不走 CSS，所以**不会**自动跟随主题；
+ * 必须在这里按当前主题取值，并在主题切换时重新 setOption（见下方 watch）。
+ * 变量取不到时回退到浅色值，保证任何情况下都有颜色可用。
+ */
+function themeColors() {
+  const cs = getComputedStyle(document.documentElement)
+  const read = (name: string, fallback: string) => {
+    const v = cs.getPropertyValue(name).trim()
+    return v || fallback
+  }
+  return {
+    brand: read('--brand', '#2d6cdf'),
+    textSecondary: read('--text-secondary', '#8492a6'),
+    axisLine: read('--border', '#e3e8ee'),
+    splitLine: read('--border', '#e3e8ee'),
+    // 环形图里「未提交」那一段：用软底色，深色主题下才不会亮得刺眼
+    muted: read('--bg-soft', '#e3e8ee'),
+  }
+}
+
 function renderCharts() {
   if (!stats.value) return
+  const c = themeColors()
   // 提交率环形图
   if (rateChartRef.value) {
     rateChart = rateChart || echarts.init(rateChartRef.value)
@@ -268,10 +306,10 @@ function renderCharts() {
           type: 'pie',
           radius: ['58%', '78%'],
           avoidLabelOverlap: false,
-          label: { show: true, position: 'center', formatter: `{value|${rate}%}\n{label|提交率}`, rich: { value: { fontSize: 26, fontWeight: 700, color: '#2d6cdf' }, label: { fontSize: 12, color: '#8492a6' } } },
+          label: { show: true, position: 'center', formatter: `{value|${rate}%}\n{label|提交率}`, rich: { value: { fontSize: 26, fontWeight: 700, color: c.brand }, label: { fontSize: 12, color: c.textSecondary } } },
           data: [
-            { value: rate, name: '已提交', itemStyle: { color: '#2d6cdf' } },
-            { value: 100 - rate, name: '未提交', itemStyle: { color: '#e3e8ee' } },
+            { value: rate, name: '已提交', itemStyle: { color: c.brand } },
+            { value: 100 - rate, name: '未提交', itemStyle: { color: c.muted } },
           ],
         },
       ],
@@ -284,14 +322,14 @@ function renderCharts() {
     distChart.setOption({
       tooltip: { trigger: 'axis' },
       grid: { left: 40, right: 16, top: 20, bottom: 28 },
-      xAxis: { type: 'category', data: dist.map((d) => d.range), axisLine: { lineStyle: { color: '#e3e8ee' } }, axisLabel: { color: '#8492a6' } },
-      yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f0f2f7' } }, axisLabel: { color: '#8492a6' } },
+      xAxis: { type: 'category', data: dist.map((d) => d.range), axisLine: { lineStyle: { color: c.axisLine } }, axisLabel: { color: c.textSecondary } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: c.splitLine } }, axisLabel: { color: c.textSecondary } },
       series: [
         {
           type: 'bar',
           data: dist.map((d) => d.count),
           barWidth: '46%',
-          itemStyle: { color: '#2d6cdf', borderRadius: [4, 4, 0, 0] },
+          itemStyle: { color: c.brand, borderRadius: [4, 4, 0, 0] },
         },
       ],
     })
@@ -366,8 +404,8 @@ function renderCharts() {
 .todo-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 4px; cursor: pointer; }
 .todo-item:hover { background: var(--bg-soft); }
 .todo-badge { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 3px; white-space: nowrap; flex-shrink: 0; }
-.badge-urgent { color: #ea580c; background: #fdf3e3; }
-.badge-normal { color: #2d6cdf; background: #e8f1fd; }
+.badge-urgent { color: var(--warn-text); background: var(--warn-bg); }
+.badge-normal { color: var(--brand); background: var(--brand-light); }
 .todo-main { flex: 1; min-width: 0; }
 .todo-title { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .todo-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }

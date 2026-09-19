@@ -111,13 +111,13 @@ function typeIcon(type: NotificationType) {
 
 function typeColor(type: NotificationType) {
   const map: Record<string, string> = {
-    [NotificationType.ANNOUNCEMENT]: '#2d6cdf',
-    [NotificationType.GRADED]: '#1fa06d',
-    [NotificationType.DEADLINE]: '#e8930c',
-    [NotificationType.REPLY]: '#7a5cc4',
-    [NotificationType.SYSTEM]: '#8492a6',
+    [NotificationType.ANNOUNCEMENT]: 'var(--brand)',
+    [NotificationType.GRADED]: 'var(--green)',
+    [NotificationType.DEADLINE]: 'var(--orange)',
+    [NotificationType.REPLY]: 'var(--purple)',
+    [NotificationType.SYSTEM]: 'var(--text-secondary)',
   }
-  return map[type] || '#8492a6'
+  return map[type] || 'var(--text-secondary)'
 }
 </script>
 

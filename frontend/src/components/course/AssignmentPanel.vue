@@ -16,7 +16,7 @@
 
     <!-- 接口缺失占位（仅在关闭 Mock 的真实接口模式下出现） -->
     <div v-if="apiMissing" class="missing-box">
-      <el-icon :size="40" color="#8492a6"><Document /></el-icon>
+      <el-icon :size="40" color="var(--text-secondary)"><Document /></el-icon>
       <h3>作业接口尚未提供</h3>
       <p>后端已建好作业数据模型（Assignment / Submission），但尚未提供 REST 接口，待补充后即可体验完整流程。</p>
       <div class="missing-apis">
@@ -277,9 +277,9 @@ function openDetail(a: Assignment) {
   justify-content: center;
   flex-shrink: 0;
 }
-.a-status.is-active { background: #e8f1fd; color: #2d6cdf; }
-.a-status.is-done { background: #e7f6ef; color: #1a7a50; }
-.a-status.is-ended { background: #f2f3f7; color: #94a3b8; }
+.a-status.is-active { background: var(--brand-light); color: var(--brand); }
+.a-status.is-done { background: var(--success-bg); color: var(--success-text); }
+.a-status.is-ended { background: var(--surface-hover); color: var(--text-secondary); }
 .a-main { min-width: 0; }
 .a-title { font-weight: 600; font-size: 14px; }
 .a-desc {
@@ -299,7 +299,7 @@ function openDetail(a: Assignment) {
 }
 .deadline-tag { font-weight: 600; font-size: 12px; }
 .deadline-tag.urgent { color: var(--orange); }
-.deadline-tag.overdue { color: #94a3b8; }
+.deadline-tag.overdue { color: var(--text-secondary); }
 .submitted-count {
   font-size: 12.5px;
   color: var(--brand);
@@ -338,7 +338,7 @@ function openDetail(a: Assignment) {
   padding: 48px 30px;
   background: var(--bg-soft);
   border-radius: var(--radius-md);
-  border: 1px dashed #c9cdf0;
+  border: 1px dashed var(--brand-border);
 }
 .missing-box h3 { margin: 12px 0 10px; }
 .missing-box p { color: var(--text-regular); line-height: 1.8; }
@@ -350,8 +350,8 @@ function openDetail(a: Assignment) {
   margin: 16px 0 22px;
 }
 .missing-apis code {
-  background: #eef0fb;
-  color: #c0341d;
+  background: var(--code-inline-bg);
+  color: var(--code-inline-text);
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 12px;

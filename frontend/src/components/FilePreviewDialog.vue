@@ -186,8 +186,8 @@ async function download() {
 }
 .code-pre {
   margin: 0;
-  background: #282c34;
-  color: #dcdfe4;
+  background: var(--code-block-bg);
+  color: var(--code-block-text);
   padding: 16px;
   border-radius: var(--radius-md);
   font-size: 13px;

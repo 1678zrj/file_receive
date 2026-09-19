@@ -26,15 +26,15 @@
           <div class="kb-stat-label">文档总数</div>
         </div>
         <div class="kb-stat-item">
-          <div class="kb-stat-value" style="color:#1fa06d">{{ stats.ready }}</div>
+          <div class="kb-stat-value" style="color:var(--green)">{{ stats.ready }}</div>
           <div class="kb-stat-label">已就绪</div>
         </div>
         <div class="kb-stat-item">
-          <div class="kb-stat-value" style="color:#e8930c">{{ stats.processing }}</div>
+          <div class="kb-stat-value" style="color:var(--orange)">{{ stats.processing }}</div>
           <div class="kb-stat-label">处理中</div>
         </div>
         <div class="kb-stat-item">
-          <div class="kb-stat-value" style="color:#e5484d">{{ stats.failed }}</div>
+          <div class="kb-stat-value" style="color:var(--red)">{{ stats.failed }}</div>
           <div class="kb-stat-label">失败</div>
         </div>
         <div class="kb-stat-item">
@@ -81,7 +81,7 @@
       <div v-loading="loading">
         <!-- 接口缺失 -->
         <div v-if="apiMissing && docs.length === 0" class="cc-card missing-box">
-          <el-icon :size="40" color="#8492a6"><Collection /></el-icon>
+          <el-icon :size="40" color="var(--text-secondary)"><Collection /></el-icon>
           <h3>知识库列表接口尚未提供</h3>
           <p>后端暂未提供「知识库文档列表」接口（建议：GET /api/v1/kb/course/{course_id}/docs）。</p>
           <el-button v-if="isTeacher" type="primary" class="btn-primary" @click="triggerPick">上传文档</el-button>
@@ -424,7 +424,7 @@ function isProcessing(status: DocumentStatus | string): boolean {
   margin-bottom: 16px;
 }
 .kb-stat-item {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 12px 14px;

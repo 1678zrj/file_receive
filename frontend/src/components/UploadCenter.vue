@@ -28,9 +28,9 @@
           <el-empty v-if="store.tasks.length === 0" description="暂无上传任务" :image-size="60" />
           <div v-for="t in store.tasks" :key="t.id" class="uc-task">
             <div class="ut-icon">
-              <el-icon v-if="isActive(t)" class="animate-pulse" color="#2d6cdf"><Loading /></el-icon>
-              <el-icon v-else-if="t.status === 'completed'" color="#1fa06d"><CircleCheckFilled /></el-icon>
-              <el-icon v-else-if="t.status === 'failed'" color="#e5484d"><CircleCloseFilled /></el-icon>
+              <el-icon v-if="isActive(t)" class="animate-pulse" color="var(--brand)"><Loading /></el-icon>
+              <el-icon v-else-if="t.status === 'completed'" color="var(--green)"><CircleCheckFilled /></el-icon>
+              <el-icon v-else-if="t.status === 'failed'" color="var(--red)"><CircleCloseFilled /></el-icon>
             </div>
             <div class="ut-main">
               <div class="ut-name" :title="t.fileName">{{ t.fileName }}</div>
@@ -135,7 +135,7 @@ function statusText(t: UploadTask) {
   bottom: -6px;
   font-size: 11px;
   font-weight: 700;
-  background: #fff;
+  background: var(--surface);
   color: var(--brand);
   border-radius: 10px;
   padding: 1px 7px;

@@ -62,6 +62,150 @@
   --el-color-primary-dark-2: #2457b2;
   --el-border-radius-base: 4px;
   --el-font-size-base: 14px;
+
+  /* ============================================================
+     语义令牌（浅色）
+     这些是给「组件里原来写死的颜色」用的：把 #fff / #fffbe6 / #f4fbf7
+     这类值收敛成变量，深色模式只需覆盖变量即可，组件代码不用动。
+     ============================================================ */
+  /* 浮在页面之上的面（白卡片、输入卡、浮层按钮） */
+  --surface: #ffffff;
+  /* 悬浮/选中态的浅底 */
+  --surface-hover: #f6f8fb;
+  /* 提示条（黄） */
+  --warn-bg: #fffbe6;
+  --warn-border: #ffe58f;
+  --warn-text: #8c6d1f;
+  /* 成功/已处理（绿） */
+  --success-bg: #f4fbf7;
+  --success-border: #b7e4cb;
+  --success-text: #1fa06d;
+  /* 滚动条 */
+  --scrollbar-thumb: #cdd5e0;
+  --scrollbar-thumb-hover: #b6c0cd;
+  /* 骨架屏微光 */
+  --skeleton-a: #eef1f5;
+  --skeleton-b: #f7f9fc;
+  /* 行内代码 */
+  --code-inline-bg: #f0f3f7;
+  --code-inline-text: #c0341d;
+  /* 代码块（浅色模式下也是深色块，属刻意的视觉选择，两套主题共用） */
+  --code-block-bg: #282c34;
+  --code-block-text: #dcdfe4;
+  --code-block-muted: #97a1b5;
+  --code-block-action: #b9c0d0;
+  /* 侧边栏（刻意做成深色学习通式；深色主题下压得更暗，才能和内容面拉开层次） */
+  --sidebar-bg: #1f2d3d;
+  --sidebar-text: #c0ccda;
+  --sidebar-text-strong: #ffffff;
+  --sidebar-hover-bg: #2a3a4d;
+  --sidebar-group-text: #6b7a8c;
+  /* 两个辅助强调色（快捷入口芯片、通知类型标签用） */
+  --purple: #7a5cc4;
+  --purple-light: #f0edfb;
+  --teal: #31859b;
+  --teal-light: #e8f4f8;
+}
+
+/*
+ * ============================================================
+ * 深色主题
+ * 只需要覆盖变量 —— 组件样式里凡是用了变量的地方都会自动跟随。
+ * 顺序上 main.css 在 element-plus 之后引入，同权重规则后者胜，
+ * 所以这里的 --el-color-primary 能覆盖 Element Plus 自带的深色主色。
+ * ============================================================
+ */
+html.dark {
+  /* 主色在深底上要提亮，否则对比度不足 */
+  --brand: #6b9bf0;
+  --brand-hover: #86abef;
+  --brand-active: #a8c4f5;
+  /* 淡蓝底改成半透明：能适配任意深色面，不必为每层各配一个色 */
+  --brand-light: rgba(107, 155, 240, 0.16);
+  --brand-border: rgba(107, 155, 240, 0.34);
+
+  /* 背景：页面最深，卡片次之，软底最浅 —— 保留层次 */
+  --bg-page: #14171c;
+  --bg-card: #1b1f26;
+  --bg-soft: #22272f;
+
+  --text-main: #e6e8ec;
+  --text-regular: #c3c9d3;
+  --text-secondary: #98a1b0;
+  --text-faint: #6f7887;
+
+  --border: #2b313a;
+  --border-dark: #3a424e;
+
+  --green: #3fbf87;
+  --orange: #e0a03f;
+  --red: #f2686c;
+  --red-light: rgba(242, 104, 108, 0.16);
+
+  /* 兼容别名 */
+  --border-light: #2b313a;
+  --brand-gradient: linear-gradient(135deg, #3f6fbf 0%, #2f5aa0 100%);
+  --brand-gradient-soft: rgba(107, 155, 240, 0.12);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.36);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.44);
+
+  /* 语义令牌（深色） */
+  --surface: #1b1f26;
+  --surface-hover: #22272f;
+  --warn-bg: rgba(232, 147, 12, 0.14);
+  --warn-border: rgba(232, 147, 12, 0.36);
+  --warn-text: #e0a03f;
+  --success-bg: rgba(63, 191, 135, 0.14);
+  --success-border: rgba(63, 191, 135, 0.34);
+  --success-text: #3fbf87;
+  --scrollbar-thumb: #3a424e;
+  --scrollbar-thumb-hover: #4b5563;
+  --skeleton-a: #22272f;
+  --skeleton-b: #2b313a;
+  --code-inline-bg: #262c35;
+  --code-inline-text: #f0876a;
+
+  /* 侧边栏：比内容面（#14171c）更暗一点，保持「侧栏是背景层」的层次 */
+  --sidebar-bg: #101318;
+  --sidebar-text: #9aa5b6;
+  --sidebar-text-strong: #e6e8ec;
+  --sidebar-hover-bg: #1d232c;
+  --sidebar-group-text: #5f6877;
+  /* 辅助强调色也要提亮（芯片底色改成半透明，深色面上才不刺眼） */
+  --purple: #a78bfa;
+  --purple-light: rgba(167, 139, 250, 0.16);
+  --teal: #4bb8d4;
+  --teal-light: rgba(75, 184, 212, 0.16);
+
+  /* Element Plus 深色下的主色（否则会退回 EP 默认的 #409eff） */
+  --el-color-primary: #6b9bf0;
+  --el-color-primary-light-3: #5583cf;
+  --el-color-primary-light-5: #4468a8;
+  --el-color-primary-light-7: #334d80;
+  --el-color-primary-light-8: #2b4068;
+  --el-color-primary-light-9: #22334f;
+  --el-color-primary-dark-2: #86abef;
+
+  /* Element Plus 组件在深色下的面/线/字（EP 自带深色已覆盖大部分，这里补齐别名与表格） */
+  --el-bg-color: #1b1f26;
+  --el-bg-color-page: #14171c;
+  --el-bg-color-overlay: #22272f;
+  --el-text-color-primary: #e6e8ec;
+  --el-text-color-regular: #c3c9d3;
+  --el-text-color-secondary: #98a1b0;
+  --el-text-color-placeholder: #6f7887;
+  --el-border-color: #2b313a;
+  --el-border-color-light: #2b313a;
+  --el-border-color-lighter: #262b33;
+  --el-fill-color-blank: #1b1f26;
+  --el-fill-color-light: #22272f;
+  --el-fill-color-lighter: #1f242c;
+  --el-mask-color: rgba(10, 12, 16, 0.75);
+  --el-table-header-bg-color: #22272f;
+  --el-table-header-text-color: #c3c9d3;
+  --el-table-border-color: #2b313a;
+  --el-table-row-hover-bg-color: #22272f;
 }
 
 * {
@@ -168,11 +312,11 @@ a:hover {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cdd5e0;
+  background: var(--scrollbar-thumb);
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b6c0cd;
+  background: var(--scrollbar-thumb-hover);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -183,9 +327,13 @@ a:hover {
   font-weight: 500;
 }
 .el-table {
-  --el-table-header-bg-color: #f6f8fb;
-  --el-table-header-text-color: #4a5568;
-  --el-table-border-color: #edf0f4;
+  /* 表头/边线交给令牌，深色模式自动跟随 */
+  --el-table-header-bg-color: var(--surface-hover);
+  --el-table-header-text-color: var(--text-regular);
+  --el-table-border-color: var(--border);
+  --el-table-row-hover-bg-color: var(--surface-hover);
+  --el-table-bg-color: var(--bg-card);
+  --el-table-tr-bg-color: var(--bg-card);
   font-size: 13.5px;
 }
 .el-table th.el-table__cell {
@@ -266,8 +414,8 @@ a:hover {
   margin: 1.15em 0;
 }
 .md-body code {
-  background: #f0f3f7;
-  color: #c0341d;
+  background: var(--code-inline-bg);
+  color: var(--code-inline-text);
   padding: 2px 5px;
   border-radius: 3px;
   font-family: 'JetBrains Mono', Consolas, monospace;
@@ -275,8 +423,8 @@ a:hover {
   font-size: 0.95em;
 }
 .md-body pre {
-  background: #282c34;
-  color: #dcdfe4;
+  background: var(--code-block-bg);
+  color: var(--code-block-text);
   padding: 14px 16px;
   border-radius: var(--radius-md);
   overflow-x: auto;
@@ -381,7 +529,7 @@ a:hover {
   margin: 0.9em 0;
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: #282c34;
+  background: var(--code-block-bg);
 }
 .md-code-bar {
   display: flex;
@@ -395,7 +543,7 @@ a:hover {
 .md-code-lang {
   font-size: 12px;
   line-height: 1.6;
-  color: #97a1b5;
+  color: var(--code-block-muted);
   font-family: 'JetBrains Mono', Consolas, monospace;
   letter-spacing: 0.02em;
   user-select: none;
@@ -411,7 +559,7 @@ a:hover {
   padding: 2px 9px;
   font-size: 12.5px;
   line-height: 1.7;
-  color: #b9c0d0;
+  color: var(--code-block-action);
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 4px;
@@ -473,7 +621,7 @@ a:hover {
 .cc-sk-line.is-short { width: 42%; }
 .cc-sk-line.is-mid { width: 68%; }
 .cc-sk-shimmer {
-  background: linear-gradient(90deg, #eef1f5 25%, #f7f9fc 37%, #eef1f5 63%);
+  background: linear-gradient(90deg, var(--skeleton-a) 25%, var(--skeleton-b) 37%, var(--skeleton-a) 63%);
   background-size: 400% 100%;
   animation: cc-shimmer 1.35s ease-in-out infinite;
 }

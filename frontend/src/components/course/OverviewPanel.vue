@@ -165,7 +165,7 @@ const progressData = computed(() => ({
 .ann-pin {
   font-size: 11px;
   color: var(--orange);
-  background: #fdf3e3;
+  background: var(--warn-bg);
   padding: 1px 7px;
   border-radius: 3px;
   flex-shrink: 0;

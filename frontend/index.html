@@ -6,6 +6,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="云课堂 - 迷你学习通在线教学平台" />
     <title>云课堂 · 在线教学平台</title>
+    <script>
+      /*
+       * 主题必须在 Vue 挂载前定好，否则会先渲染一帧浅色再切深色（闪白）。
+       * 所以这里用一段内联脚本同步读取偏好并打上 html.dark。
+       * 键名与 src/stores/theme.ts 中的 THEME_KEY 保持一致。
+       */
+      (function () {
+        try {
+          var stored = localStorage.getItem('cc_theme')
+          var mode =
+            stored === 'dark' || stored === 'light'
+              ? stored
+              : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          if (mode === 'dark') document.documentElement.classList.add('dark')
+          // 让原生滚动条、表单控件、自动填充等也跟着切换
+          document.documentElement.style.colorScheme = mode
+        } catch (e) {
+          /* 取不到偏好就按浅色走，不影响渲染 */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

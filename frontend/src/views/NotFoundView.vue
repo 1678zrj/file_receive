@@ -29,7 +29,7 @@
 .nf-code {
   font-size: 96px;
   font-weight: 900;
-  background: linear-gradient(135deg, #2d6cdf 0%, #1f5fc4 100%);
+  background: var(--brand-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

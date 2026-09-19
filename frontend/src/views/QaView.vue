@@ -69,8 +69,9 @@
       <!--
         这里刻意**没有顶栏**：聊天区直接顶到最上面，把纵向空间全留给消息。
         原来顶栏里的东西都并进了输入区上方那一行（见下方 scope-row）：
-        课程选择、运行状态 = 左侧；停止/继续接收、会话操作「⋯」= 右侧。
+        课程选择、运行状态 = 左侧；重新连接/继续接收、会话操作「⋯」= 右侧。
         这些控件只在需要时出现，空闲时那一行几乎只有一个课程芯片。
+        （「停止接收」不在这里 —— 它由输入框里的按钮在运行中切换承担。）
       -->
 
       <el-alert
@@ -109,14 +110,14 @@
 
           <!-- 空会话 + 没选课程：提示先选课程 -->
           <div v-else-if="messages.length === 0 && selectedCourseId == null" class="chat-welcome">
-            <div class="cw-logo"><el-icon :size="40" color="#2d6cdf"><MagicStick /></el-icon></div>
+            <div class="cw-logo"><el-icon :size="40" color="var(--brand)"><MagicStick /></el-icon></div>
             <h3>课程 Agent 智能助手</h3>
             <p>请先在右上角选择一门课程知识库，然后就可以开始提问了</p>
           </div>
 
           <!-- 空会话 + 已选课程：欢迎页 + 推荐问题 -->
           <div v-else-if="messages.length === 0" class="chat-welcome">
-            <div class="cw-logo"><el-icon :size="40" color="#2d6cdf"><MagicStick /></el-icon></div>
+            <div class="cw-logo"><el-icon :size="40" color="var(--brand)"><MagicStick /></el-icon></div>
             <h3>课程 Agent 智能助手</h3>
             <p>基于《{{ courseName }}》的知识库，可检索资料、并在需要时向你提问澄清</p>
             <div class="suggest-grid">
@@ -164,7 +165,7 @@
                     />
                     <div v-else-if="p.answers?.length" class="answer-echo">
                       <div class="ae-head">
-                        <el-icon :size="13" color="#1fa06d"><CircleCheckFilled /></el-icon>
+                        <el-icon :size="13" color="var(--success-text)"><CircleCheckFilled /></el-icon>
                         已回复
                       </div>
                       <div v-for="a in p.answers" :key="a.id" class="ae-row">
@@ -261,11 +262,9 @@
               </span>
 
               <span class="scope-row-actions">
-                <el-button v-if="isStreaming" text size="small" :icon="VideoPause" @click="onStop">
-                  停止接收
-                </el-button>
+                <!-- 「停止接收」不在这里了：它由输入框里的按钮在运行中切换承担（见下方 composer） -->
                 <el-button
-                  v-else-if="runState === 'stalled'"
+                  v-if="runState === 'stalled'"
                   text
                   size="small"
                   :icon="RefreshRight"
@@ -324,21 +323,40 @@
                 resize="none"
                 :placeholder="
                   selectedCourseId == null
-                    ? '请先选择课程知识库后再提问...'
-                    : '输入问题，Enter 发送，Shift + Enter 换行...'
+                    ? '请先选择课程知识库后再提问（可以先打字）...'
+                    : isStreaming
+                      ? 'Agent 正在输出，可以先把下一个问题写好...'
+                      : '输入问题，Enter 发送，Shift + Enter 换行...'
                 "
-                :disabled="isStreaming || selectedCourseId == null"
                 @keydown.enter.exact.prevent="send"
               />
+              <!--
+                同一个按钮随状态切换：
+                  运行中 → 停止接收（点了立刻断开，已收到的内容保留）
+                  空闲   → 发送
+                文案保持「停止接收」而不是「停止生成」：后端目前没有取消接口，
+                这一下只断开前端的接收，worker 仍在跑（用户可再点「继续接收」接回来）。
+              -->
               <el-button
+                v-if="isStreaming"
+                class="send-btn stop-btn"
+                circle
+                size="large"
+                title="停止接收（后端可能仍在执行，可稍后继续接收）"
+                @click="onStop"
+              >
+                <span class="stop-glyph" />
+              </el-button>
+              <el-button
+                v-else
                 type="primary"
                 class="send-btn btn-primary"
                 :icon="Promotion"
                 circle
                 size="large"
-                :disabled="!input.trim() || isStreaming || selectedCourseId == null"
+                :disabled="!input.trim() || selectedCourseId == null"
+                :title="selectedCourseId == null ? '请先选择课程知识库' : '发送'"
                 @click="send"
-                title="发送"
               />
             </div>
           </div>
@@ -658,10 +676,20 @@ function ask(text: string) {
 }
 
 async function send() {
-  const text = input.value
-  if (!text.trim()) return
+  const text = input.value.trim()
+  if (!text) return
   if (selectedCourseId.value == null) {
     ElMessage.warning('请先在右上角选择课程知识库')
+    return
+  }
+  /*
+   * Agent 输出中：只拦「发送」，不拦「输入」—— 用户可以先把下一个问题打好草稿。
+   * ⚠️ 这里必须**在清空输入框之前**拦住：
+   * 否则按 Enter 会先把 input 清空、再被 useAgentChat.send() 因为 streaming 静默 return，
+   * 结果是草稿被吃掉、消息也没发出去（踩过这个坑）。
+   */
+  if (isStreaming.value) {
+    ElMessage.warning('Agent 正在输出，等本轮结束或点「停止接收」后再发送')
     return
   }
   input.value = ''
@@ -946,15 +974,15 @@ async function onSessionCommand(command: SessionCommand) {
   color: var(--text-secondary);
 }
 .run-state.is-waiting {
-  border-color: #ffe58f;
-  background: #fffbe6;
-  color: #8c6d1f;
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 .run-state.is-reconnecting,
 .run-state.is-stalled {
-  border-color: #ffd591;
-  background: #fff7e6;
-  color: #ad4e00;
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 .run-state.is-stopped {
   border-color: var(--border);
@@ -1181,8 +1209,8 @@ async function onSessionCommand(command: SessionCommand) {
 
 /* 中断回答回显 */
 .answer-echo {
-  background: #f4fbf7;
-  border: 1px solid #b7e4cb;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
   border-radius: var(--radius-md);
   padding: 9px 13px;
   margin-bottom: 10px;
@@ -1193,7 +1221,7 @@ async function onSessionCommand(command: SessionCommand) {
   gap: 5px;
   font-size: 13px;
   font-weight: 600;
-  color: #1fa06d;
+  color: var(--success-text);
   margin-bottom: 6px;
 }
 .ae-row {
@@ -1231,7 +1259,7 @@ async function onSessionCommand(command: SessionCommand) {
 .to-bottom.has-new {
   border-color: var(--brand);
   color: var(--brand);
-  background: #fff;
+  background: var(--surface);
 }
 
 /* 输入框上方那一行：作用域 + 状态 + 运行控制 + 会话操作 */
@@ -1315,6 +1343,30 @@ async function onSessionCommand(command: SessionCommand) {
 }
 .send-btn {
   flex-shrink: 0;
+}
+/*
+ * 运行中的「停止接收」按钮：做成「反色」——
+ * 底色用正文色、方块用卡片色。
+ * 这样浅色模式下是深色圆 + 白方块，深色模式下自动变成浅色圆 + 深方块，
+ * 两套主题都保持高对比（写死 #2b3646 的话，深色主题下会变成深色圆配深色底，看不见）。
+ */
+.stop-btn {
+  background: var(--text-main);
+  border-color: var(--text-main);
+  padding: 0;
+}
+.stop-btn:hover,
+.stop-btn:focus {
+  background: var(--text-main);
+  border-color: var(--text-main);
+  filter: brightness(1.25);
+}
+.stop-glyph {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--bg-card);
 }
 .fade-enter-active {
   transition: opacity 0.2s;

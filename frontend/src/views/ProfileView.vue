@@ -128,7 +128,7 @@ async function logout() {
   margin-top: -43px;
 }
 .pc-avatar {
-  border: 4px solid #fff;
+  border: 4px solid var(--surface);
   box-shadow: var(--shadow-md);
 }
 .pc-name {

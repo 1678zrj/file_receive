@@ -137,9 +137,10 @@ const preview = computed(() => {
 })
 
 const statusColor = computed(() => {
-  if (props.part.status === 'completed') return '#1fa06d'
-  if (props.part.status === 'failed') return '#e5484d'
-  return '#2d6cdf'
+  // 用 CSS 变量而不是写死颜色：深色主题下会自动换成提亮过的状态色
+  if (props.part.status === 'completed') return 'var(--green)'
+  if (props.part.status === 'failed') return 'var(--red)'
+  return 'var(--brand)'
 })
 
 const statusText = computed(() => {
@@ -255,7 +256,7 @@ async function onContentClick(e: MouseEvent) {
 
 /* 工具调用块 */
 .part-tool {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;

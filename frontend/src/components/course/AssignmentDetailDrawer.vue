@@ -332,7 +332,7 @@ async function downloadFile(fileRecordId: number, fileName: string) {
   margin-top: 8px;
 }
 .ms-feedback p {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 10px 12px;

@@ -260,7 +260,7 @@ function goQa() {
   min-height: calc(100vh - 180px);
 }
 .space-nav {
-  background: #fff;
+  background: var(--surface);
   border-right: 1px solid var(--border);
   padding: 12px 8px;
 }

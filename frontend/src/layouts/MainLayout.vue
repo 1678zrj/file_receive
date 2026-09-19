@@ -72,6 +72,16 @@
         </div>
 
         <div class="topbar-right">
+          <!-- 主题切换：浅色 ⇄ 深色（图标表示「当前已是该模式」的反面，即点击后会切到的模式） -->
+          <el-button
+            text
+            circle
+            size="small"
+            class="theme-toggle"
+            :icon="theme.isDark ? Sunny : Moon"
+            :title="theme.isDark ? '切换到浅色模式' : '切换到深色模式'"
+            @click="theme.toggle()"
+          />
           <!-- 消息通知中心 -->
           <NotificationCenter />
           <el-tag size="small" effect="plain" :type="roleTagType" class="role-tag">
@@ -112,8 +122,10 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 import { roleName } from '@/utils/format'
 import { config } from '@/config'
+import { Moon, Sunny } from '@element-plus/icons-vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import UploadCenter from '@/components/UploadCenter.vue'
 import NotificationCenter from '@/components/NotificationCenter.vue'
@@ -121,6 +133,7 @@ import NotificationCenter from '@/components/NotificationCenter.vue'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const theme = useThemeStore()
 
 const collapsed = ref(false)
 /** 是否移动端窄屏 */
@@ -184,7 +197,7 @@ async function onCommand(cmd: string) {
 
 /* ---------- 侧边栏：深色学习通式 ---------- */
 .sidebar {
-  background: #1f2d3d;
+  background: var(--sidebar-bg);
   display: flex;
   flex-direction: column;
   transition: width 0.25s ease;
@@ -212,7 +225,7 @@ async function onCommand(cmd: string) {
 .logo-text {
   font-size: 16px;
   font-weight: 600;
-  color: #fff;
+  color: var(--sidebar-text-strong);
   white-space: nowrap;
   letter-spacing: 1px;
 }
@@ -222,17 +235,18 @@ async function onCommand(cmd: string) {
   background: transparent;
 }
 .side-menu :deep(.el-menu-item) {
-  color: #c0ccda;
+  color: var(--sidebar-text);
   height: 44px;
   margin: 2px 8px;
   border-radius: 4px;
 }
 .side-menu :deep(.el-menu-item:hover) {
-  background: #2a3a4d;
-  color: #fff;
+  background: var(--sidebar-hover-bg);
+  color: var(--sidebar-text-strong);
 }
 .side-menu :deep(.el-menu-item.is-active) {
   background: var(--brand);
+  /* 主色底上的文字：两套主题都保持白色 */
   color: #fff;
 }
 .side-menu :deep(.el-menu-item .el-icon) {
@@ -241,7 +255,7 @@ async function onCommand(cmd: string) {
 .menu-group-title {
   padding: 14px 16px 6px;
   font-size: 11px;
-  color: #6b7a8c;
+  color: var(--sidebar-group-text);
   letter-spacing: 1px;
   user-select: none;
 }
@@ -250,7 +264,7 @@ async function onCommand(cmd: string) {
   padding: 8px 12px;
   border-radius: 4px;
   background: rgba(232, 147, 12, 0.15);
-  color: #f0b35e;
+  color: var(--warn-text);
   font-size: 12px;
   display: flex;
   align-items: center;
@@ -266,7 +280,7 @@ async function onCommand(cmd: string) {
   flex-direction: column;
 }
 .topbar {
-  background: #fff;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;

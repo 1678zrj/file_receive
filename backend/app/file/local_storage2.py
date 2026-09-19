@@ -15,8 +15,11 @@ from pathlib import Path
 import asyncio
 import shutil
 
+
+# 这个在多进程中不应该在父进程创建时加载，应该放到全局加载
+# 而且该并发控制只能做到单进程控制，要实现分布式控制还得用到Redis
 upload_sem = asyncio.Semaphore(10)
-merge_sem = asyncio.Semaphore(1)
+
 
 class LocalStorage(BaseStorage):
     def __init__(self):

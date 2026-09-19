@@ -15,7 +15,7 @@
       @drop.prevent="onDrop"
       @click="pickFile"
     >
-      <el-icon :size="44" color="#2d6cdf"><UploadFilled /></el-icon>
+      <el-icon :size="44" color="var(--brand)"><UploadFilled /></el-icon>
       <p class="dz-text">点击选择文件，或拖拽到此处</p>
       <p class="dz-hint">支持大文件分片上传 · 断点续传 · 秒传</p>
     </div>
@@ -186,7 +186,7 @@ function onClosed() {
 
 <style scoped>
 .upload-dropzone {
-  border: 2px dashed #c9cdf0;
+  border: 2px dashed var(--brand-border);
   border-radius: var(--radius-md);
   padding: 40px 20px;
   text-align: center;

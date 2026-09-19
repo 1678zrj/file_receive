@@ -1,7 +1,7 @@
 <template>
   <div class="interrupt-form">
     <div class="if-header">
-      <el-icon :size="16" color="#e8930c"><QuestionFilled /></el-icon>
+      <el-icon :size="16" color="var(--orange)"><QuestionFilled /></el-icon>
       <span class="if-title">需要你确认以下信息</span>
     </div>
 
@@ -74,8 +74,8 @@ function submit() {
 <style scoped>
 .interrupt-form {
   margin-top: 8px;
-  border: 1px solid #f0d9a8;
-  background: #fffaf0;
+  border: 1px solid var(--warn-border);
+  background: var(--warn-bg);
   border-radius: var(--radius-md);
   padding: 14px 16px;
 }
@@ -88,7 +88,7 @@ function submit() {
 .if-title {
   font-size: 13.5px;
   font-weight: 600;
-  color: #b7760a;
+  color: var(--warn-text);
 }
 .if-question {
   margin-bottom: 14px;

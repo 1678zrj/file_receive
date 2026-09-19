@@ -128,10 +128,10 @@ function scoreClass(score: number) {
   font-weight: 600;
   font-size: 13.5px;
 }
-.score-excellent { color: #16a34a; }
-.score-good { color: #2d6cdf; }
-.score-pass { color: #b7760a; }
-.score-fail { color: #dc2626; }
+.score-excellent { color: var(--green); }
+.score-good { color: var(--brand); }
+.score-pass { color: var(--orange); }
+.score-fail { color: var(--red); }
 .dim-text {
   color: var(--text-faint);
 }
