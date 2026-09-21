@@ -6,7 +6,7 @@ import uuid
 from langchain_core.tools import BaseTool
 from sqlmodel import update
 from app.db.worker_session import AsyncSessionWorker
-from app.rag_agent.graph import graph
+
 from app.core.rag_deps import rag_container
 from langchain_core.messages import HumanMessage, AIMessageChunk, AIMessage, ToolMessage, ToolCall
 from langgraph.types import Command
@@ -22,7 +22,7 @@ from app.models.agent import RunStatus, Run, MessageStatus, Message, MessageRole
 from sqlalchemy.orm.attributes import flag_modified
 from redis.asyncio import Redis
 from app.crud.interrupt_crud import interrupt_crud
-
+from app.rag_agent.graph_container import graph_container
 
 logger = logging.getLogger(__name__)
 
@@ -405,6 +405,7 @@ async def execute_agent_run(
                 "scope_id": run_scope_id
             }
         }
+        graph = graph_container.graph
         chunk_count = 0
         # 上一次数据落库时间
         last_db_flush = asyncio.get_running_loop().time()

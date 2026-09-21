@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     model_name: str
     base_url: str
     api_key: str
+    psycopg_url: str = "postgresql://root:123456@localhost:5432/study"
 
 
 settings = Settings()
