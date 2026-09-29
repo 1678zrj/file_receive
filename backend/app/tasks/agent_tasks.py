@@ -18,6 +18,7 @@ from app.lock.redis_lock import RedisDistributedLock
 from app.crud.run_crud import run_crud
 from app.crud.thread_crud import thread_crud
 from app.crud.message_crud import message_crud
+from app.crud.user_crud import user_crud
 from app.models.agent import RunStatus, Run, MessageStatus, Message, MessageRole, Interrupt, InterruptStatus
 from sqlalchemy.orm.attributes import flag_modified
 from redis.asyncio import Redis
@@ -449,6 +450,12 @@ async def execute_agent_run(
                 db,
                 run_uuid
             )
+            # 获取当前用户的权限信息
+            current_user = await user_crud.get_by_id(
+                db,
+                run.user_id
+            )
+
             if assistant_message is not None and assistant_message.parts:
                 initial_parts = list(assistant_message.parts)
         # 初始化 accumulator
@@ -473,7 +480,9 @@ async def execute_agent_run(
             "configurable": {
                 "thread_id": str(thread_uuid),
                 "scope": run_scope,
-                "scope_id": run_scope_id
+                "scope_id": run_scope_id,
+                "user_id": current_user.id,
+                "user_role": current_user.role.value
             }
         }
         graph = graph_container.graph

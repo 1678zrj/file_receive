@@ -3,9 +3,9 @@ import logging
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import RunnableConfig
-from app.rag_agent.tools import tools
 from app.rag_agent.state import OverAllState
 from app.rag_agent.model import llm_client_manager
+from app.rag_agent.tool_registry import tool_registry
 from app.rag_agent.llm_exception import normalize_llm_exception, LLMUnknownError
 from langchain_core.messages import AIMessage, BaseMessage
 import random
@@ -81,6 +81,8 @@ async def call_model(state: OverAllState, config: RunnableConfig):
     user_api_key = configurable.get("api_key")
     user_base_url = configurable.get("base_url")
     user_model_name = configurable.get("model_name")
+    user_role = configurable.get("user_role")
+    tools = tool_registry.get_role_tools(user_role)
     model = llm_client_manager.get_model(
         provider=user_provider,
         api_key=user_api_key,
