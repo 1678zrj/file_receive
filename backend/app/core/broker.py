@@ -37,7 +37,7 @@
 
 from taskiq import TaskiqEvents, TaskiqState
 from taskiq_redis import ListQueueBroker
-from app.rag_agent.model_container import model_container
+from app.rag_agent.model import llm_client_manager
 from app.rag_agent.graph_container import graph_container
 from app.core.config import settings
 from app.core.rag_deps import rag_container
@@ -91,7 +91,7 @@ async def _agent_worker_startup(state: TaskiqState):
 
     await RedisManager.init()
     await rag_container.startup()
-    await model_container.startup()
+    await llm_client_manager.startup()
     await graph_container.startup()
     print("Agent worker started, rag ready")
 
@@ -99,6 +99,7 @@ async def _agent_worker_startup(state: TaskiqState):
 @agent_broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
 async def _agent_worker_shutdown(state: TaskiqState):
     await graph_container.shutdown()
+    await llm_client_manager.shutdown()
     await rag_container.shutdown()
     await RedisManager.close()
     print("Agent worker stopped")

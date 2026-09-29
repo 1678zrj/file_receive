@@ -80,6 +80,10 @@
   --success-bg: #f4fbf7;
   --success-border: #b7e4cb;
   --success-text: #1fa06d;
+  /* 失败/错误（红）：Agent Run 执行失败提示、工具调用失败等 */
+  --error-bg: #fdf2f2;
+  --error-border: #f5c2c4;
+  --error-text: #b4292d;
   /* 滚动条 */
   --scrollbar-thumb: #cdd5e0;
   --scrollbar-thumb-hover: #b6c0cd;
@@ -159,6 +163,9 @@ html.dark {
   --success-bg: rgba(63, 191, 135, 0.14);
   --success-border: rgba(63, 191, 135, 0.34);
   --success-text: #3fbf87;
+  --error-bg: rgba(242, 104, 108, 0.14);
+  --error-border: rgba(242, 104, 108, 0.34);
+  --error-text: #f2686c;
   --scrollbar-thumb: #3a424e;
   --scrollbar-thumb-hover: #4b5563;
   --skeleton-a: #22272f;

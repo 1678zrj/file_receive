@@ -762,6 +762,20 @@ export interface AgentChatMessage {
   interrupt?: InterruptPayload | null
   /** 发送失败后可重试的信息；成功后清空 */
   retry?: RetryPayload
+  /**
+   * 本轮 Run **执行失败**的原因（来自后端 `failed` 事件的 `error_message`）。
+   *
+   * 注意与 `retry` 的区别：
+   *  - `retry` 是「请求根本没发出去 / 创建 Run 失败」，可以复用同一幂等键重发；
+   *  - `runError` 是「Run 已经创建并跑过，执行中途挂了」——发送本身是成功的，
+   *    此时不该显示「重试发送」，而应如实告知失败并给出原因。
+   *
+   * 后端异常分支（`agent_tasks.py`）现在会依次做四件事：
+   * 把挂起的工具置为终态 → 消息落库 `status='failed'` → Run 置为 `failed` → publish `failed` 事件。
+   * 所以流式期间能拿到**具体原因**；但历史接口（`SingleMessageResponse`）只返回 `status`
+   * 而不返回 `error_message`，刷新 / 换设备后只能退化为通用说明（见 useAgentChat 的说明）。
+   */
+  runError?: string
   /** 本条消息使用的知识库标签（如课程名），用于展示 */
   scopeLabel?: string
   /** 本条消息所属的后端 Run id（用于刷新后重新连接 stream 重放） */

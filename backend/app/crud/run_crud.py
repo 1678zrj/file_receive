@@ -80,6 +80,23 @@ class RunCrud:
         )
         await db.exec(stmt)
 
+    async def set_run_failed(self, db: AsyncSession, id: uuid.UUID, error_message: str):
+        stmt = update(Run).where(
+            Run.id == id,
+            Run.status.in_(
+                [
+                    RunStatus.QUEUED.value,
+                    RunStatus.IN_PROGRESS.value
+                ]
+            )
+        ).values(
+            status = RunStatus.FAILED.value,
+            error_code="AGENT_EXECUTION_FAILED",
+            error_message=error_message,
+            finished_at = utc_now()
+        )
+        await db.exec(stmt)
+
 
 
 

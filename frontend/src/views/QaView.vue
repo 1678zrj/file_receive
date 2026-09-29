@@ -196,6 +196,18 @@
                   </el-button>
                 </div>
 
+                <!--
+                  本轮 Run **执行失败**（后端 failed 事件带回 error_message）。
+                  必须与上面的 retry-box 区分开：那个是「请求根本没发出去」，
+                  这个是「Run 已经跑起来了、中途挂了」——发送本身是成功的，
+                  所以不该显示「重试发送」，而要如实告诉用户挂了以及为什么挂。
+                  刷新/换设备后服务端只保留 status='failed'，这里会退化为通用说明。
+                -->
+                <div v-if="m.runError && !m.streaming" class="failed-box">
+                  <el-icon :size="14" class="fb-icon"><WarningFilled /></el-icon>
+                  <span class="fb-text">{{ m.runError }}</span>
+                </div>
+
                 <div class="msg-time">
                   <span v-if="m.scopeLabel" class="scope-tag">📚 {{ m.scopeLabel }}</span>
                   {{ formatDateTime(m.created_at, 'HH:mm:ss') }}
@@ -384,6 +396,7 @@ import {
   Download,
   DocumentCopy,
   CircleCheckFilled,
+  WarningFilled,
   MoreFilled,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
@@ -1246,6 +1259,33 @@ async function onSessionCommand(command: SessionCommand) {
 /* 失败重试 */
 .retry-box {
   margin-bottom: 10px;
+}
+
+/*
+  本轮 Run 执行失败。
+  与上面的 .retry-box 是两回事：那是「请求没发出去」，这是「跑起来了但中途挂了」，
+  所以这里不用按钮，而是把后端 failed 事件里的 error_message 如实摊开给用户看。
+*/
+.failed-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--error-border);
+  background: var(--error-bg);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--error-text);
+}
+.fb-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.fb-text {
+  min-width: 0;
+  word-break: break-word;
 }
 
 .to-bottom {

@@ -713,6 +713,23 @@ export function useAgentChat(
     if (isAssistant && answers?.length && !parts.some((p) => p.type === 'interrupt')) {
       parts = [...parts, { type: 'interrupt', answers }]
     }
+    /*
+     * 失败的 Run：后端异常分支会把消息落成 `status='failed'`（agent_tasks.py 的 except）。
+     * 但历史接口 `SingleMessageResponse` **不返回 error_message**，所以刷新 / 换设备后
+     * 拿不到具体原因，只能给通用说明。具体原因在流式期间由 `failed` 事件带过来，
+     * 并由 loadMessages() 回填到同一条消息上（见那里的说明）。
+     */
+    const runError =
+      isAssistant && m.status === 'failed'
+        ? '本轮执行失败（服务端只保留了失败状态，未返回具体原因，可查看后端日志）'
+        : undefined
+    // 兜底：消息整体是 failed 时，仍标着「调用中」的工具块也一并置为失败。
+    // 正常情况后端 mark_unfinished_tools 已经改过库了，这里只是防御。
+    if (runError) {
+      for (const p of parts) {
+        if (p.type === 'tool_call' && p.status === 'running') p.status = 'failed'
+      }
+    }
     return {
       id: m.id,
       role: isAssistant ? 'assistant' : 'user',
@@ -724,6 +741,7 @@ export function useAgentChat(
       scopeLabel: options.resolveScopeLabel?.(m.scope, m.scope_id),
       // 后端已返回 run_id：用于刷新后精确定位「该 Run 的 assistant 消息」
       runId: m.run_id ?? undefined,
+      runError,
       created_at: m.created_at,
     }
   }
@@ -837,7 +855,22 @@ export function useAgentChat(
       const list = await agentApi.listMessages(tid)
       // 请求期间该会话可能已经开始新一轮 → 不覆盖实时内容
       if (session.streaming) return
-      const converted = list.map((m) => toChatMessage(m, session.interruptAnswers))
+      /*
+       * 服务端只存 `status='failed'`，不存 error_message。
+       * 而收到终态事件后前端会主动对一次服务端（consumeStream 末尾 setTimeout 400ms），
+       * 若直接采用服务端数据，会把刚拿到的**具体失败原因**冲成通用文案。
+       * 所以这里把流式期间记下的原因按 run_id 带回来。
+       */
+      const liveReasonByRun = new Map<string, string>()
+      for (const m of session.messages) {
+        if (m.runId && m.runError) liveReasonByRun.set(m.runId, m.runError)
+      }
+      const converted = list.map((m) => {
+        const next = toChatMessage(m, session.interruptAnswers)
+        const liveReason = next.runId ? liveReasonByRun.get(next.runId) : undefined
+        if (next.runError && liveReason) next.runError = liveReason
+        return next
+      })
       if (session.loaded && converted.length < session.messages.length) return
       session.messages = converted
       session.loaded = true
@@ -1196,6 +1229,20 @@ export function useAgentChat(
   }
 
   /**
+   * 把消息里仍在「调用中」的工具块收尾为终态。
+   *
+   * 对应后端的 `RunExecutionAccumulator.mark_unfinished_tools(status="failed")`。
+   * Run 异常退出时后端会把挂起的工具在**数据库里**置为失败，但流里**不会**补发对应的
+   * `tool_result` 事件，所以前端必须自己收尾 —— 否则工具卡片会永远显示「调用中…」，
+   * 用户看到的是一个卡死的转圈。
+   */
+  function failRunningTools(msg: AgentChatMessage, status = 'failed') {
+    for (const p of msg.parts) {
+      if (p.type === 'tool_call' && p.status === 'running') p.status = status
+    }
+  }
+
+  /**
    * 消费 SSE 长连接。
    * @param lastEventId 不传 = 后端从 Redis Stream 头重放（用于刷新重连）
    */
@@ -1302,19 +1349,22 @@ export function useAgentChat(
           session.stopped = false
         } else if (endedCleanly && !terminalEventSeen && !stoppedByUser) {
           /*
-           * 后端 worker 只 publish 了 completed，**异常路径并不 publish failed/canceled**
-           * （agent_tasks.py 的 except 分支只 `raise`）。此时 stream 路由会在
-           * 「15s 轮询发现 run 已终态」后直接 return，表现为「连接正常关闭但没有任何终态事件」。
+           * 「连接正常关闭、却没有任何终态事件」。
+           *
+           * 后端异常路径现在会 publish `failed`（见 agent_tasks.py 的 except），
+           * 所以走到这里基本只剩两类原因：执行进程被**强杀**（SIGKILL / OOM，except 根本没机会执行，
+           * 数据库里的 Run 甚至还是 in_progress），或者 Redis Stream 被裁剪。
            * 既然是干净关闭，就说明服务端已判定该 run 结束，这里补一个终态，
            * 避免下次刷新又去重连一个已终止的 run（那会 403）。
            */
           session.runFinished = true
           session.stopped = false
+          if (msg) failRunningTools(msg)
           if (msg && msg.parts.length === 0 && !msg.content) {
             msg.parts.push({
               type: 'text',
               content:
-                '😥 本轮没有返回任何内容：Agent 执行失败或被中断（后端当前不会推送 failed/canceled 事件）。',
+                '😥 本轮没有返回任何内容：连接被服务端关闭，但没有收到终态事件。常见原因是执行进程被强杀（SIGKILL / OOM）——这种时候后端来不及推送 failed 事件，请查看后端日志。',
             })
           }
         }
@@ -1417,9 +1467,51 @@ export function useAgentChat(
         break
       }
       case 'completed':
-      case 'failed':
-      case 'canceled':
         flushBuffer(bufferKey(live.id, runId))
+        msg.streaming = false
+        live.streaming = false
+        live.runFinished = true
+        // 正常收尾：清掉可能残留的失败标记（同一消息不会复用到新一轮，纯属兜底）
+        msg.runError = undefined
+        schedulePersist()
+        break
+      /*
+       * Run 执行失败 —— 后端异常分支现在会补齐三件事（agent_tasks.py 的 except）：
+       *   1. `accumulator.mark_unfinished_tools(status="failed")`：把还挂着的工具置为终态
+       *   2. `flush_to_db(status=MessageStatus.FAILED)` + `set_run_failed()`：消息与 Run 落成失败
+       *   3. `publish_event("failed", {"error_message": ...})`
+       *
+       * 前端必须对应做两件事，否则用户会把「跑挂了」当成「正常答完了」：
+       *   - 把失败原因挂到消息上显示出来（`error_message`）
+       *   - 把仍在「调用中」的工具块置为失败：后端置的是**数据库**里的状态，
+       *     而流里**不会**补发对应的 tool_result，前端不跟着改的话工具卡片会永远转圈
+       */
+      case 'failed': {
+        flushBuffer(bufferKey(live.id, runId))
+        const reason = typeof data?.error_message === 'string' ? data.error_message.trim() : ''
+        msg.runError = reason
+          ? `本轮执行失败：${reason}`
+          : '本轮执行失败（后端未返回具体原因，可查看后端日志）'
+        failRunningTools(msg)
+        // Run 已经死了，不再等用户回答
+        msg.interrupt = null
+        live.pendingInterrupt = null
+        msg.streaming = false
+        live.streaming = false
+        live.runFinished = true
+        schedulePersist()
+        break
+      }
+      case 'canceled':
+        /*
+         * 后端目前不会 publish canceled（`RunStatus.CANCELED` 定义了，但取消接口还没做，
+         * 前端那个「停止接收」只是断开接收）。这一支是为后端补上取消能力时预留的，
+         * 语义与 failed 的区别只是「不是异常，而是被取消」。
+         */
+        flushBuffer(bufferKey(live.id, runId))
+        failRunningTools(msg)
+        msg.interrupt = null
+        live.pendingInterrupt = null
         msg.streaming = false
         live.streaming = false
         live.runFinished = true

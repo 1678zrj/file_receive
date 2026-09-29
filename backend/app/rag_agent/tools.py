@@ -4,12 +4,7 @@ from pydantic import BaseModel, Field
 from app.services.rag_search_service import RAGSearchService
 from app.core.rag_deps import rag_container
 from langgraph.types import interrupt
-
-
-
-
-
-
+from app.rag_agent.schema import ToolMetadata, UserRole, ToolAction, InterruptPolicy
 
 
 class RunRAGInput(BaseModel):
@@ -33,6 +28,12 @@ async def search(query: str, config: RunnableConfig):
     result = await rag_search_service.search(query, scope, scope_id)
     return result
 
+search.metadata = ToolMetadata(
+    allowed_roles=[UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
+    tool_action=ToolAction.READ,
+    interrupt_policy = None,
+    require_interrupt = False
+).model_dump()
 
 class QuestionOption(BaseModel):
     label: str = Field(description="给用户的问题可选项的标签")
@@ -88,7 +89,14 @@ async def ask_user_question(questions: list[Question]):
         }
     )
     return response
+ask_user_question.metadata=ToolMetadata(
+    allowed_roles=[UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
+    tool_action=ToolAction.READ,
+    interrupt_policy=InterruptPolicy.REQUIRE_INPUT,
+    require_interrupt=True
+).model_dump()
 
+tools = [search, ask_user_question]
 
-
+tool_handler = {tool.name: tool for tool in tools}
 

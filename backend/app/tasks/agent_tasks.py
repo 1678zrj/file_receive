@@ -8,7 +8,7 @@ from sqlmodel import update
 from app.db.worker_session import AsyncSessionWorker
 
 from app.core.rag_deps import rag_container
-from langchain_core.messages import HumanMessage, AIMessageChunk, AIMessage, ToolMessage, ToolCall
+from langchain_core.messages import HumanMessage, AIMessageChunk, AIMessage, ToolMessage, ToolCall, BaseMessage
 from langgraph.types import Command
 from app.redis.redis_client import RedisManager
 from app.models.base import utc_now
@@ -23,6 +23,8 @@ from sqlalchemy.orm.attributes import flag_modified
 from redis.asyncio import Redis
 from app.crud.interrupt_crud import interrupt_crud
 from app.rag_agent.graph_container import graph_container
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +169,9 @@ class RunExecutionAccumulator:
             tool_call_id in self.tool_refs
             and self.tool_refs[tool_call_id].get("status") in ("completed", "failed")
         ):
-            return False, self.tool_refs["status"]
+            # 被注释的代码有问题，但一直没有报错就是因为防御性代码从没被触发过
+            # return False, self.tool_refs["status"]
+            return False, self.tool_refs[tool_call_id].get("status", "completed")
         # 真正要做的
         # 注意status需要自己显式设置，在langgraph的工具调用执行节点中
         msg_status = tool_message.status
@@ -183,7 +187,7 @@ class RunExecutionAccumulator:
             self.tool_refs[tool_call_id]["output"] = content_str
         else:
             self.tool_refs[tool_call_id] = {
-                "tool_call_id": tool_call_id,
+                "id": tool_call_id,
                 "name": None,
                 "args": {},
                 "status": final_status,
@@ -202,7 +206,16 @@ class RunExecutionAccumulator:
             }
         )
         return True, final_status
-
+    def mark_unfinished_tools(self, status: str = "failed"):
+        """
+            当Run中断（不是指human in the loop中断）、取消、或异常退出时，将依然挂起未running的工具置为终态
+        """
+        for ref in self.tool_refs.values():
+            if ref.get("status") == "running":
+                ref["status"] = status
+        for part in self.parts:
+            if part["type"] == "tool_call" and part["status"] == "running":
+                part["status"] = status
 
 
 
@@ -224,6 +237,83 @@ class RunExecutionAccumulator:
     def citations(self) -> list[dict[str, Any]]:
         """向下兼容 Message.citations 字段，若后续引入 RAG 引用可在此扩展"""
         return []
+
+# 该函数是为了修复因worker因中断或断电等中途崩溃事件而导致的错误消息队列
+def sanitize_and_prepare_messages(
+        history_messages: list[BaseMessage],
+        new_user_content: str
+) -> list[BaseMessage]:
+    """
+        1、可能在用户输入消息之后，call_model节点还没有返回最新响应就崩溃了
+        2、可能call_model返回了最新响应，但是工具调用还没执行就崩溃了，或者考虑到有多个工具节点
+        只执行了部分就结束了
+        针对第一个问题，修复方案比较简单，添加上人工设置的AIMessage即可
+        判断是否是第一个问题，只需要看消息列表中的最后一条消息是否是HumanMessage即可
+        针对第二个问题，先补齐缺失的ToolMessage，再补上AIMessage
+        判断是否是第二个问题，
+        1、消息列表的最后一条消息是带有toolcall的AIMessage
+        2、消息列表的最后一条消息是ToolMessage
+        已知两个问题出现时都需要补上AIMessage，因此先修复ToolMessage缺失的问题，再补上AIMessage缺失的问题
+    """
+    # 在没有历史消息的情况下用户发送第一条请求就失败了
+    if not history_messages:
+        return [HumanMessage(content=new_user_content)]
+    repaired_patch: list[BaseMessage] = []
+    existing_tool_call_ids = set()
+    last_ai_message = None
+    for message in reversed(history_messages):
+        # 符合第一种情况，还没获取模型响应便报错结束
+        if isinstance(message, HumanMessage):
+            break
+        # 可能是遍历到AIMessage，也可能最后一条消息是AIMessage
+        elif isinstance(message, AIMessage):
+            last_ai_message = message
+            break
+        # 保存已经执行了的工具的id，这样就不需要构造了
+        elif isinstance(message, ToolMessage):
+            existing_tool_call_ids.add(message.tool_call_id)
+    # 只要last_ai_message不为空，就肯定是第二种情况，而不是第一种
+    if last_ai_message is not None:
+        # AIMessage有工具调用，增加一层判定是为了防止call_model节点在条件边判断响应没工具调用时是连接的不是END
+        # 建议：使用 getattr 提高防御性
+        tool_calls = getattr(last_ai_message, "tool_calls", None) or []
+        if tool_calls:
+            missing_tool_calls = [
+                tool_call
+                for tool_call in tool_calls
+                if tool_call["id"] not in existing_tool_call_ids
+            ]
+            # 补上缺失的ToolMessage
+            for tc in missing_tool_calls:
+                repaired_patch.append(
+                    ToolMessage(
+                        tool_call_id=tc["id"],
+                        content="[System Note]: Tool execution aborted due to unexpected worker interruption.",
+                        status="error"
+                    )
+                )
+            # 再补上AIMessage
+            repaired_patch.append(
+                AIMessage(
+                    content="[前序任务已中断，已切换至您的最新输入。]"
+                )
+            )
+        # 一条纯文本AIMessage，不需要补上ToolMessage
+        else:
+            pass
+    # last_ai_message为空，说明是第一种情况
+    else:
+        # 第一种情况只需要补上AIMessage
+        repaired_patch.append(
+            AIMessage(
+                content="[前序响应中断，已切换至您的最新输入。]"
+            )
+        )
+    # 用户新的输入，必须加上
+    repaired_patch.append(HumanMessage(content=new_user_content))
+    return repaired_patch
+
+
 
 async def flush_to_db(
     run_id: uuid.UUID,
@@ -338,7 +428,7 @@ async def execute_agent_run(
                 Run.status.in_(allowed_statuses)
             ).values(
                 status=RunStatus.IN_PROGRESS.value,
-                started_at=(Run.started_at or utc_now())
+                started_at=utc_now()
             )
             result = await db.execute(stmt)
             if result.rowcount != 1:
@@ -379,6 +469,14 @@ async def execute_agent_run(
             {}
         )
         # 接下来是graph的正式运行
+        config = {
+            "configurable": {
+                "thread_id": str(thread_uuid),
+                "scope": run_scope,
+                "scope_id": run_scope_id
+            }
+        }
+        graph = graph_container.graph
         # 先获取用户的输入
         if resume:
             # 如果是中断响应
@@ -397,15 +495,20 @@ async def execute_agent_run(
                     raise RuntimeError(
                         f"User message not found for run {run_id}"
                     )
-            graph_input = {"messages": [HumanMessage(content=user_message.content)]}
-        config = {
-            "configurable": {
-                "thread_id": str(thread_uuid),
-                "scope": run_scope,
-                "scope_id": run_scope_id
-            }
-        }
-        graph = graph_container.graph
+            state = await graph.aget_state(config)
+            # 说明graph不是正常运行完终止的，需要修复
+            # （Worker崩溃悬挂或用户直接打断并换话题）
+            if state.next:
+                logger.info("开始进行消息列表的修复")
+                history_messages = state.values.get("messages", [])
+                patch_messages = sanitize_and_prepare_messages(
+                    history_messages,
+                    user_message.content
+                )
+                graph_input = {"messages": patch_messages}
+            else:
+                graph_input = {"messages": [HumanMessage(content=user_message.content)]}
+
         chunk_count = 0
         # 上一次数据落库时间
         last_db_flush = asyncio.get_running_loop().time()
@@ -565,12 +668,42 @@ async def execute_agent_run(
             "completed",
             {}
         )
-    except Exception as e:
+    except Exception as exc:
         """
             这是运行过程中出现异常，
             那么需要将数据库中的执行状态置为failed
+            消息要落盘并置状态
             还要发送事件
         """
+        try:
+            accumulator.mark_unfinished_tools(status="failed")
+            await flush_to_db(
+                run_uuid,
+                thread_uuid,
+                accumulator,
+                status=MessageStatus.FAILED.value
+            )
+        except Exception as e:
+
+            pass
+        try:
+            async with AsyncSessionWorker() as db:
+                await run_crud.set_run_failed(
+                    db,
+                    run_uuid,
+                    error_message=str(exc)
+                )
+                await db.commit()
+        except Exception as e:
+
+            pass
+        await publish_event(
+            redis_client,
+            run_uuid,
+            "failed",
+            {"error_message": str(exc)}
+        )
+
         raise
     finally:
         await worker_lock.release()
