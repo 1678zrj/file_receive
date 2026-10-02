@@ -28,12 +28,14 @@ async def search(query: str, config: RunnableConfig):
     result = await rag_search_service.search(query, scope, scope_id)
     return result
 
+
 search.metadata = ToolMetadata(
     allowed_roles=[UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
     tool_action=ToolAction.READ,
-    interrupt_policy = None,
-    require_interrupt = False
+    interrupt_policy=None,
+    require_interrupt=False
 ).model_dump()
+
 
 class QuestionOption(BaseModel):
     label: str = Field(description="给用户的问题可选项的标签")
@@ -56,6 +58,7 @@ class AskUserQuestionInput(BaseModel):
         description="需要相关用户批量提问的问题列表，单次提问不超过3个"
     )
 
+
 """
 该工具的用户回复应该按照此格式：
 [
@@ -75,6 +78,7 @@ class AskUserQuestionInput(BaseModel):
 注：这是对前端的要求
 """
 
+
 @tool(name_or_callable="ask_user_question", args_schema=AskUserQuestionInput)
 async def ask_user_question(questions: list[Question]):
     """
@@ -89,9 +93,11 @@ async def ask_user_question(questions: list[Question]):
         }
     )
     return response
-ask_user_question.metadata=ToolMetadata(
+
+
+ask_user_question.metadata = ToolMetadata(
     allowed_roles=[UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
-    tool_action=ToolAction.READ,
+    tool_action=ToolAction.INTERACTIVE,
     interrupt_policy=InterruptPolicy.REQUIRE_INPUT,
     require_interrupt=True
 ).model_dump()
@@ -99,4 +105,3 @@ ask_user_question.metadata=ToolMetadata(
 tools = [search, ask_user_question]
 
 tool_handler = {tool.name: tool for tool in tools}
-

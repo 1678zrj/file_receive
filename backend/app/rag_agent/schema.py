@@ -11,6 +11,7 @@ class UserRole(int, Enum):
 class ToolAction(str, Enum):
     READ = "read"
     WRITE = "write"
+    INTERACTIVE = "interactive"
 
 
 # 中断策略

@@ -22,15 +22,30 @@ class ToolRegistry:
                     self._role_tools_handler_dict[allowed_role.value][tool.name] = tool
 
     def get_tool_by_name(self, tool_name: str) -> BaseTool | None:
+        """
+        根据工具名获取对应的工具
+        面向的是系统的所有工具集
+        """
         return self._tools_handler.get(tool_name)
 
     def get_tool_by_name_and_role(self, tool_name: str, role: int) -> BaseTool | None:
+        """
+        根据工具名和角色权限获取对应的工具
+        需要工具名和角色权限都符合对应的工具
+        """
         return self._role_tools_handler_dict.get(role, {}).get(tool_name)
 
     def get_role_tools_handler(self, role: int) -> dict[str, BaseTool]:
+        """
+        根据角色获取可使用的工具字典
+        工具字典中是工具名及其对应工具
+        """
         return self._role_tools_handler_dict.get(role, {})
 
     def get_role_tools(self, role: int) -> list[BaseTool]:
+        """
+        根据角色获取可使用的工具列表
+        """
         return list(self._role_tools_handler_dict.get(role, {}).values())
 
 
