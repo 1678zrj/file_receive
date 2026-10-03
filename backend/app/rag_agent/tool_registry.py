@@ -19,7 +19,7 @@ class ToolRegistry:
             if tool.metadata:
                 allowed_roles = tool.metadata.get("allowed_roles", [])
                 for allowed_role in allowed_roles:
-                    self._role_tools_handler_dict[allowed_role.value][tool.name] = tool
+                    self._role_tools_handler_dict[allowed_role][tool.name] = tool
 
     def get_tool_by_name(self, tool_name: str) -> BaseTool | None:
         """

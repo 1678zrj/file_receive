@@ -111,7 +111,7 @@ async def call_model(state: OverAllState, config: RunnableConfig):
 async def router_after_agent(state: OverAllState):
     if state.get("fatal_error"):
         return END
-    last_message = state["messages"]
+    last_message = state["messages"][-1]
     if getattr(last_message, "tool_calls", None) or getattr(last_message, "invalid_tool_calls", None):
         return "gate_dispatcher_node"
     return END

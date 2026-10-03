@@ -354,6 +354,49 @@ async def flush_to_db(
             flag_modified(message, "citations")
         await db.commit()
 
+async def handle_graph_fatal_error(
+    accumulator: RunExecutionAccumulator,
+    run_uuid: uuid.UUID,
+    thread_uuid: uuid.UUID,
+    error_msg: str,
+    redis_client: Redis
+):
+    """
+        这是运行过程中出现异常，
+        那么需要将数据库中的执行状态置为failed
+        消息要落盘并置状态
+        还要发送事件
+    """
+    try:
+        accumulator.mark_unfinished_tools(status="failed")
+        await flush_to_db(
+            run_uuid,
+            thread_uuid,
+            accumulator,
+            status=MessageStatus.FAILED.value
+        )
+    except Exception as e:
+
+        pass
+    try:
+        async with AsyncSessionWorker() as db:
+            await run_crud.set_run_failed(
+                db,
+                run_uuid,
+                error_message=error_msg
+            )
+            await db.commit()
+    except Exception as e:
+
+        pass
+    await publish_event(
+        redis_client,
+        run_uuid,
+        "failed",
+        {"error_message": error_msg}
+    )
+
+
 
 @agent_broker.task(task_name="agent_run_task")
 async def execute_agent_run(
@@ -514,9 +557,17 @@ async def execute_agent_run(
                     history_messages,
                     user_message.content
                 )
-                graph_input = {"messages": patch_messages}
+                graph_input = {
+                    "messages": patch_messages,
+                    "pending_tasks": [],
+                    "fatal_error": None
+                }
             else:
-                graph_input = {"messages": [HumanMessage(content=user_message.content)]}
+                graph_input = {
+                    "messages": [HumanMessage(content=user_message.content)],
+                    "pending_tasks": [],
+                    "fatal_error": None
+                }
 
         chunk_count = 0
         # 上一次数据落库时间
@@ -616,8 +667,26 @@ async def execute_agent_run(
                 )
                 # 更新完之后刷新时间
                 last_db_flush = now
-        # graph 运行完毕之后，判断是正常完毕还是因为内部发起了中断
+        # graph 运行完毕之后，判断是正常完毕还是因为内部发起了中断还是内部存在fatal_error
+        # 对于这些情况应当有不同的应对策略
+        # 获取当前的全局状态
         state = await graph.aget_state(config)
+        # 获取fatal_error
+        fatal_error = state.values.get("fatal_error")
+        # 发生了fatal error导致的中断
+        if fatal_error:
+            # 获取报错消息
+            error_msg = fatal_error.get("message", "Fatal infrastructure or LLM failure")
+            logger.error("Run %s terminated gracefully with fatal error: %s", run_uuid, error_msg)
+            await handle_graph_fatal_error(
+                accumulator,
+                run_uuid,
+                thread_uuid,
+                error_msg,
+                redis_client
+            )
+            return
+        # 没有fatal error，检测是否内部发生了中断
         active_interrupts = []
         for task in state.tasks:
             interrupts = getattr(task, "interrupts", None)
@@ -712,7 +781,6 @@ async def execute_agent_run(
             "failed",
             {"error_message": str(exc)}
         )
-
         raise
     finally:
         await worker_lock.release()
