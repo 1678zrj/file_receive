@@ -4,3 +4,28 @@
 /backend/__pycache__/
 /backend/*.pyc
 /backend/data
+__pycache__
+
+
+node_modules
+dist
+docs
+.npm-cache
+dist-ssr
+*.local
+.DS_Store
+
+# Editor
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

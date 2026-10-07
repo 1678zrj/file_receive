@@ -1,6 +1,6 @@
 import asyncio
 
-from pymilvus import AsyncMilvusClient, DataType, Function
+from pymilvus import AsyncMilvusClient, DataType, Function, RRFRanker
 from pymilvus.client.types import LoadState, FunctionType
 from pymilvus import AnnSearchRequest
 from app.rag.vector_stores.base import BaseVectorStore
@@ -51,11 +51,11 @@ class MilvusVectorStore(BaseVectorStore):
     async def _create_collection(self):
         client = self.client
         schema = client.create_schema(
-            auto_id=False,
+            auto_id=True,
             enable_dynamic_field=True
         )
         # 文本块的唯一主键，使用 knowledge_doc_id_chunk_index
-        schema.add_field("id", DataType.VARCHAR, is_primary=True, max_length=256)
+        schema.add_field("id", DataType.INT64, is_primary=True)
         schema.add_field("dense_vector", DataType.FLOAT_VECTOR, dim=1024)
         schema.add_field("sparse_vector", DataType.SPARSE_FLOAT_VECTOR)
         analyzer_params = {
@@ -112,7 +112,7 @@ class MilvusVectorStore(BaseVectorStore):
             )
         return self._client
 
-    async def upsert(
+    async def insert(
             self,
             dense_vectors: list[list[float]],
             chunk_texts: list[str],
@@ -123,14 +123,9 @@ class MilvusVectorStore(BaseVectorStore):
             scope_id: str,
             is_enabled: bool = True
     ) -> dict:
-        # 1. 提前生成所有 ID 列表
-        ids = [
-            f"knowledge_doc_{knowledge_doc_id}_chk_{i}"
-            for i in range(len(dense_vectors))
-        ]
+
         data = [
             {
-                "id": ids[i],
                 "dense_vector": dense_vector,
                 "chunk_text": chunk_texts[i],
                 "knowledge_doc_id": knowledge_doc_id,
@@ -143,14 +138,14 @@ class MilvusVectorStore(BaseVectorStore):
             }
             for i, dense_vector in enumerate(dense_vectors)
         ]
-        res = await self.client.upsert(
+        res = await self.client.insert(
             collection_name=self.collection_name,
             data=data
         )
         # 4. 将生成的 ids 合并到返回结果中
         return {
-            "upsert_count": res.get("upsert_count", len(ids)),
-            "ids": ids
+            "insert_count": res.get("insert_count", len(dense_vectors)),
+            "ids": res.get("ids")
         }
 
     async def delete_by_doc_id(
@@ -192,7 +187,9 @@ class MilvusVectorStore(BaseVectorStore):
                 "file_record_id",
                 "file_hash",
                 "scope",
-                "scope_id"
+                "scope_id",
+                "knowledge_doc_id",
+                "chunk_index"
             ]
 
         search_param_1 = {
@@ -217,15 +214,16 @@ class MilvusVectorStore(BaseVectorStore):
         }
         request_2 = AnnSearchRequest(**search_param_2)
         reqs = [request_1, request_2]
-        ranker = Function(
-            name="rrf",
-            input_field_names=[],
-            function_type=FunctionType.RERANK,
-            params={
-                "reranker": "rrf",
-                "k": 100
-            }
-        )
+        # ranker = Function(
+        #     name="rrf",
+        #     input_field_names=[],
+        #     function_type=FunctionType.RERANK,
+        #     params={
+        #         "reranker": "rrf",
+        #         "k": 100
+        #     }
+        # )
+        ranker = RRFRanker(100)
         res = await self.client.hybrid_search(
             collection_name=self.collection_name,
             reqs=reqs,
@@ -241,7 +239,7 @@ class MilvusVectorStore(BaseVectorStore):
             entity = hit["entity"]
             # 其余的id,score都在hit字典中，是必返回字段
             id = hit.get("id")
-            score = hit.get("score")
+            score = hit.get("distance")
             results.append(
                 {
                     "id":id,

@@ -7,7 +7,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import Depends
 from app.crud.upload_crud import upload_crud
 from pathlib import Path
-from app.core.rag_deps import get_rag
+from app.core.rag_deps import get_rag_container
+from app.models.base import User, UserRole
 from app.rag.container import RAGContainer
 from app.rag.embeddings.base import BaseEmbedder
 from app.rag.vector_stores.base import BaseVectorStore
@@ -19,23 +20,21 @@ from app.models.rag import KnowledgeDoc, DocumentStatus
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
+from app.file.key_builder import build_final_path
 
 
 class RAGIndexService:
     def __init__(
             self,
-            rag_container: RAGContainer = Depends(get_rag),
-            embedder: BaseEmbedder = Depends(get_embedder),
-            vector_store: BaseVectorStore = Depends(get_vector_store),
-            db: AsyncSession = Depends(get_session)
+            rag_container: RAGContainer,
+            db: AsyncSession
     ):
 
         self.db = db
         self.rag_container = rag_container
-        self.embedder = embedder
-        self.vector_store = vector_store
+        self.embedder = rag_container.embedder
+        self.vector_store = rag_container.vector_store
         self.rag_markdown_storage_dir = settings.rag_markdown_storage_dir
-
 
     def _build_markdown_storage_key(
             self,
@@ -46,17 +45,13 @@ class RAGIndexService:
         relative_path = f"scope_{scope}/{scope_id}/doc_{knowledge_doc_id}.md"
         return self.rag_markdown_storage_dir / relative_path, relative_path
 
-
-
-
     # 该函数专用于上传文件到向量数据库
-    # 不用于更新已存在向量数据库中的某文件，那个实现逻辑更加复杂
     async def index_course_file(
             self,
             title: str,
             file_record_id: int,
             course_id: int,
-            teacher_id: int,
+            teacher: User,
             scope: str = "course",
             splitter_type: str = "markdown",
             chunk_size: int = 1024
@@ -68,7 +63,7 @@ class RAGIndexService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"课程ID {course_id} 不存在"
             )
-        if target_course.teacher_id != teacher_id:
+        if target_course.teacher_id != teacher.id and teacher.role != UserRole.ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="无权管理该课程的知识库"
@@ -102,9 +97,9 @@ class RAGIndexService:
                 )
             # 2、已存在且正在进行解析、分块、向量化中的任何一步（这里假定的是状态在这些情况都是正常进行的，而不是异常终止的）
             elif existing_kb_doc.status in (
-                DocumentStatus.CHUNKING,
-                DocumentStatus.INDEXING,
-                DocumentStatus.PARSING
+                    DocumentStatus.CHUNKING,
+                    DocumentStatus.INDEXING,
+                    DocumentStatus.PARSING
             ):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -114,9 +109,9 @@ class RAGIndexService:
             # 这种情况下，两个可以视为同时进行的操作必然进行争夺，因为两个完全相同的请求只有一个可以进行处理
             elif existing_kb_doc.status == DocumentStatus.FAILED:
                 # 这里利用数据库的单行排他锁（即数据库自带锁），通过查看当前更新操作影响的数量来判断谁抢到了
-                row_count = await knowledge_base_crud.update_kb_doc_failed_status(
+                row_count = await knowledge_base_crud.update_kb_doc_parsing_status(
                     self.db,
-                    id = existing_kb_doc.id
+                    id=existing_kb_doc.id
                 )
                 if row_count == 0:
                     raise HTTPException(
@@ -144,7 +139,7 @@ class RAGIndexService:
                 "file_record_id": file_record_id,
                 "scope": scope,
                 "scope_id": scope_id,
-                "created_by": teacher_id,
+                "created_by": teacher.id,
                 "status": DocumentStatus.PARSING
             }
             try:
@@ -162,11 +157,13 @@ class RAGIndexService:
                     detail="并发创建冲突，该任务已由另一个请求创建并正在处理中"
                 )
         # 执行到这里，前面的一系列权限和并发安全操作都做完了，可以正经写业务代码了
+        doc_id = kb_doc.id
         try:
             # 第一步是文档解析
             # 如果markdown文件已经存在,则可以不用解析,直接读取,否则解析并持久化存储
             if kb_doc.markdown_storage_key is None:
-                raw_file_path = Path(raw_file_record.storage_key)
+                # raw_file_path = Path(raw_file_record.storage_key)
+                raw_file_path = build_final_path(raw_file_record.storage_key)
                 async with ayafileio.open(raw_file_path, mode='rb') as f:
                     file_bytes = await f.read()
                 file_parser = self.rag_container.get_parser(raw_file_record.file_ext)
@@ -181,11 +178,13 @@ class RAGIndexService:
                 await aiofiles.os.makedirs(markdown_storage_key.parent, exist_ok=True)
                 async with ayafileio.open(markdown_storage_key, mode='w', encoding='utf-8') as f:
                     await f.write(markdown_text)
-                kb_doc.markdown_storage_key = markdown_storage_key
+                #  这里存储的应该是相对路径
+                kb_doc.markdown_storage_key = relative_path
             else:
                 markdown_file_path = self.rag_markdown_storage_dir / kb_doc.markdown_storage_key
                 async with ayafileio.open(markdown_file_path, mode='r', encoding='utf-8') as f:
                     markdown_text = await f.read()
+
             kb_doc.status = DocumentStatus.CHUNKING
             self.db.add(kb_doc)
             await self.db.commit()
@@ -203,7 +202,7 @@ class RAGIndexService:
             await self.db.commit()
             # 开始进行向量化
             dense_vectors = await self.embedder.embed_documents(chunk_texts)
-            vector_insert_res = await self.vector_store.upsert(
+            vector_insert_res = await self.vector_store.insert(
                 dense_vectors=dense_vectors,
                 chunk_texts=chunk_texts,
                 knowledge_doc_id=kb_doc.id,
@@ -238,13 +237,31 @@ class RAGIndexService:
             return kb_doc
         except Exception as e:
             await self.db.rollback()
-            kb_doc.status = DocumentStatus.FAILED
-            kb_doc.error_msg = str(e)
-            self.db.add(kb_doc)
-            await self.db.commit()
+            # 这里必须使用doc_id而不是kb_doc.id，因为rollback后kb_doc过期了
+            try:
+                await knowledge_base_crud.update_kb_doc_failed_status(self.db, doc_id, str(e)[:250])
+                await self.db.commit()
+            # 异常捕获，防止连锁异常导致向量数据库中的脏数据没被清理
+            # 不能和e重名，否则会覆盖
+            except Exception as db_error:
+
+                pass
+            try:
+                await self.vector_store.delete_by_doc_id(doc_id)
+            except Exception as vector_error:
+
+                pass
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"知识库构建失败:{str(e)}"
             )
 
 
+async def get_rag_index_service(
+        rag_container: RAGContainer = Depends(get_rag_container),
+        db: AsyncSession = Depends(get_session)
+) -> RAGIndexService:
+    return RAGIndexService(
+        rag_container,
+        db
+    )

@@ -18,7 +18,7 @@ async def register_course_resource(
 ):
     course_resource = await course_resource_service.register_course_resource(
         course_resource_in,
-        teacher.id
+        teacher
     )
     return course_resource
 

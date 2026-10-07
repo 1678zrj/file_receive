@@ -3,14 +3,14 @@ import uuid
 
 import aiofiles.os
 
-from app.core.broker import broker
+from app.core.broker import merge_broker
 from app.crud.upload_crud import upload_crud
 from app.file.local_storage2 import LocalStorage
 from app.file.session_manager import get_session_manager, SessionManager
 from app.file.storage_factory import get_storage
 import asyncio
-from app.file.key_builder import build_tmp_path, build_final_path
-from app.db.session import AsyncSessionLocal
+from app.file.key_builder import build_tmp_path, build_final_path, build_storage_key
+from app.db.worker_session import AsyncSessionWorker
 from app.core.config import settings
 from app.redis.redis_client import RedisManager
 from app.schemas.upload_schema import UploadStatus
@@ -47,7 +47,7 @@ async def cleanup_resources(
 
 
 
-@broker.task(task_name="merge_file_task")
+@merge_broker.task(task_name="merge_file_task")
 async def merge_file(
     upload_id: str
 ):
@@ -66,11 +66,12 @@ async def merge_file(
         total_chunks = session.total_chunks
         source_paths = [build_tmp_path(upload_id, i) for i in range(total_chunks)]
         chunks_dir = source_paths[0].parent
-        true_target_path = build_final_path(upload_id, session.file_name)
+        storage_key = build_storage_key(upload_id, session.file_name)
+        true_target_path = build_final_path(storage_key)
         fake_target_path = Path(f"{true_target_path}.{uuid.uuid4().hex}.tmp")
         # 数据库永远保证兜底校验
         # 1 合并前秒传检测: 若已有记录,直接复用并清理分片
-        async with AsyncSessionLocal() as db:
+        async with AsyncSessionWorker() as db:
             existing_file_record = await upload_crud.get_file_record_by_hash(db, session.file_hash)
             # 说明已经合并完成了,worker可能重复执行
             if existing_file_record is not None:
@@ -97,13 +98,13 @@ async def merge_file(
             temp_merged = False
             target_merged = True
             # 以上操作完成后,可以进行数据库持久化保存了
-            async with AsyncSessionLocal() as db:
+            async with AsyncSessionWorker() as db:
                 try:
                     # 合并成功后将数据插入到数据库
                     file_record = await upload_crud.create_upload(
                         db=db,
                         storage_type=settings.storage_type,
-                        storage_key=str(true_target_path),
+                        storage_key=storage_key,
                         total_size=session.total_size,
                         file_hash=session.file_hash,
                         file_ext=session.file_ext,
@@ -125,7 +126,7 @@ async def merge_file(
                     if existing_file_record is not None:
                         await session_manager.set_completed(upload_id, existing_file_record.id)
                         # 如果已有其它用户上传文件落盘了
-                        if existing_file_record.storage_key != str(true_target_path):
+                        if existing_file_record.storage_key != storage_key:
                             # 当前用户的需要清理
                             await cleanup_resources(files=[true_target_path])
                             # 清理完成了才设置为False
