@@ -4,7 +4,7 @@ import sys
 from langgraph.graph.state import CompiledStateGraph
 from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from app.rag_agent.graph2 import graph_builder
+from app.rag_agent.graph import graph_builder
 from app.core.config import settings
 
 

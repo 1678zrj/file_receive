@@ -1,9 +1,9 @@
 import asyncio
 import logging
-from langgraph.graph import END
+
 from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import RunnableConfig
-from app.rag_agent.state2 import OverAllState
+from app.rag_agent.deprecate.state import OverAllState
 from app.rag_agent.model import llm_client_manager
 from app.rag_agent.tool_registry import tool_registry
 from app.rag_agent.llm_exception import normalize_llm_exception, LLMUnknownError
@@ -90,31 +90,8 @@ async def call_model(state: OverAllState, config: RunnableConfig):
         model_name=user_model_name
     )
     model_with_tools = model.bind_tools(tools)
-    try:
-        response = await run_model_with_retry(messages, model_with_tools, config)
-        return {"messages": [response]}
-    # 这里捕获异常代表发生了无法重试的异常。或者重试次数达到上限了
-    except Exception as e:
-        fail_msg = AIMessage(
-            content=f"大模型服务凭证失效或不可用：{str(e)}"
-        )
-        return {
-            "messages": [fail_msg],
-            "pending_tasks": [],
-            "fatal_error": {
-                "source": "call_model",
-                "message": str(e)
-            }
-        }
-
-
-async def router_after_agent(state: OverAllState):
-    if state.get("fatal_error"):
-        return END
-    last_message = state["messages"][-1]
-    if getattr(last_message, "tool_calls", None) or getattr(last_message, "invalid_tool_calls", None):
-        return "gate_dispatcher_node"
-    return END
+    response = await run_model_with_retry(messages, model_with_tools, config)
+    return {"messages": [response]}
 
 
 

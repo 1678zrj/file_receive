@@ -24,7 +24,8 @@ class InterruptPolicy(str, Enum):
 
 class ToolMetadata(BaseModel):
     allowed_roles: list[UserRole] = Field(
-        default_factory=lambda: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN])
+        default_factory=lambda: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN]
+    )
     tool_action: ToolAction = ToolAction.READ
     interrupt_policy: InterruptPolicy | None = None
     require_interrupt: bool = False

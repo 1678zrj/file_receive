@@ -1,34 +1,17 @@
-from langchain_core.messages import AIMessage
-from langgraph.graph import add_messages, StateGraph, START, END
-from app.rag_agent.call_tool_node import tool_node
-# 导入上一节中定义的工具
+from langgraph.graph import StateGraph, START
 from app.rag_agent.state import OverAllState
-from app.rag_agent.call_model_node import call_model
-
-
-
-
-
-
-
-
-
-
-
-
-
-async def should_continue(state: OverAllState):
-    messages = state["messages"]
-    last_message: AIMessage = messages[-1]
-    if last_message.tool_calls:
-        return "tool_node"
-    return END
-
+from app.rag_agent.call_model_node import router_after_agent, call_model
+from app.rag_agent.call_tool_node import gate_dispatcher_node, interactive_node, read_batch_node, router_next_task
 
 graph_builder = StateGraph(state_schema=OverAllState)
-graph_builder.add_node("call_model", call_model)
-graph_builder.add_node("tool_node", tool_node)
-graph_builder.add_edge(START, "call_model")
-graph_builder.add_edge("tool_node", "call_model")
-graph_builder.add_conditional_edges("call_model", should_continue)
 
+
+graph_builder.add_node("call_model", call_model)
+graph_builder.add_node("gate_dispatcher_node", gate_dispatcher_node)
+graph_builder.add_node("read_batch_node", read_batch_node)
+graph_builder.add_node("interactive_node", interactive_node)
+graph_builder.add_edge(START, "call_model")
+graph_builder.add_conditional_edges("call_model", router_after_agent)
+graph_builder.add_conditional_edges("gate_dispatcher_node", router_next_task)
+graph_builder.add_conditional_edges("read_batch_node", router_next_task)
+graph_builder.add_conditional_edges("interactive_node", router_next_task)
